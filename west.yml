@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The west manifest file for embedded systems based on Zephyr.
+
+manifest:
+  version: "0.13"
+
+  defaults:
+    remote: zephyrproject
+
+  # further "remotes" 
+  remotes:
+    - name: zephyrproject
+      url-base: https://github.com/zephyrproject-rtos
+
+  self:
+    path: ws-zephyr
+
+  projects:
+    - name: zephyr
+      path: zephyr
+      remote: zephyrproject
+      repo-path: zephyr
+      revision: main
+
+      import:
+        # Keep this list sorted alphabetically.
+        name-allowlist:
+          - cmsis_6
+          - hal_espressif
+          - mbedtls
+          - segger
