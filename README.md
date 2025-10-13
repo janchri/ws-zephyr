@@ -4,7 +4,7 @@ This guide provides step-by-step instructions to initialize and configure a Zeph
 
 ## Prerequisites
 
-- Ensure you have `dependencies` installed. Refer to the [Zephyr Project documentation](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) for installation details.
+- Ensure you have `dependencies` installed. Refer to [Zephyr Project documentation](https://docs.zephyrproject.org/latest/develop/getting_started/index.html).
 - Python and `pip` must be installed on your system.
 - A compatible shell environment (e.g., Bash). 
 
