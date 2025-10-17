@@ -63,9 +63,10 @@ static struct k_work_delayable w1_ds18b20_work;
 
 static void poll_all_sensors(struct k_work *work)
 {
+	k_work_reschedule(&w1_ds18b20_work, K_SECONDS(POLL_INTERVAL_SECONDS));
 	LOG_DBG("Start polling sensors");
     for (int i = 0; i < sensor_count; i++) {
-	struct sensor_value attributes;
+		struct sensor_value attributes;
 		struct ds18b20_sensor *sensor = &sensors[i];
 
 		w1_rom_to_sensor_value(&sensor->value.rom, &attributes);
@@ -82,8 +83,6 @@ static void poll_all_sensors(struct k_work *work)
 		zbus_chan_pub(&ds18b20_value_chan, &sensor->value, K_MSEC(11));
     }
 	LOG_DBG("End polling sensors - Start messaging");
-
-	k_work_reschedule(&w1_ds18b20_work, K_SECONDS(POLL_INTERVAL_SECONDS));
 }
 
 static int w1_ds18b20_init(void)
