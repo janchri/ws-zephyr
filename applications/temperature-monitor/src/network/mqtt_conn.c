@@ -12,6 +12,7 @@
 #include <zephyr/net/net_context.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/zbus/zbus.h>
+#include <zephyr/sys/reboot.h>
 
 #include "w1_ds18b20.h"
 #include "credentials.h"
@@ -20,7 +21,8 @@
 #define MQTT_PORT 1883
 #define MQTT_TOPIC "zephyr/sensor"
 
-#define CONFIG_APPLICATION_MQTT_CONN_INIT_PRIORITY 92
+#define CONFIG_MQTT_STACKSIZE 1024
+#define CONFIG_MQTT_PRIORITY 7
 
 LOG_MODULE_REGISTER(mqtt_conn, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -208,16 +210,19 @@ static int app_mqtt_process_mqtt(struct mqtt_client *client)
 	if (poll_socks(MQTT_POLL_MSEC)) {
 		rc = mqtt_input(client);
 		if (rc != 0) {
+			LOG_ERR("mqtt_input failed #0");
 			return rc;
 		}
 	}
 
 	rc = mqtt_live(client);
 	if (rc != 0 && rc != -EAGAIN) {
+		LOG_ERR("mqtt_live failed");
 		return rc;
 	} else if (rc == 0) {
 		rc = mqtt_input(client);
 		if (rc != 0) {
+			LOG_ERR("mqtt_input failed #1");
 			return rc;
 		}
 	}
@@ -254,9 +259,10 @@ static void wifi_interface_init(void)
 	k_sem_take(&netif_ready, K_FOREVER);
 }
 
-static int mqtt_conn_init(void)
+
+static void mqtt_thread()
 {
-	LOG_INF("MQTT Init");
+	LOG_INF("mqtt_thread - starting");
 
 	wifi_interface_init();
 	app_mqtt_connect(&client_ctx);
@@ -265,8 +271,22 @@ static int mqtt_conn_init(void)
 	struct ds18b20_value *ds18b20_value_msg;
 	uint8_t temp_str[16];
 	char rom_str[40];
+	int rc;
+	static int count = 50;
+
 	while(1) {
-		app_mqtt_process_mqtt(&client_ctx);
+		rc = app_mqtt_process_mqtt(&client_ctx);
+
+		if(rc != 0){
+			count--;
+		}
+		else{
+			count = 50;
+		}
+		if(count<0)
+		{
+			sys_reboot(SYS_REBOOT_COLD);
+		}
 
 		while(!zbus_sub_wait(&mqtt_conn_sub, &chan, K_MSEC(200))){
 			ds18b20_value_msg = zbus_chan_msg(&ds18b20_value_chan);
@@ -286,6 +306,6 @@ static int mqtt_conn_init(void)
 			app_mqtt_publish(&client_ctx, rom_str, temp_str);
 		}
 	}
-    return 0;
 }
-SYS_INIT(mqtt_conn_init, APPLICATION, CONFIG_APPLICATION_MQTT_CONN_INIT_PRIORITY);
+
+K_THREAD_DEFINE(mqtt_thread_id, CONFIG_MQTT_STACKSIZE, mqtt_thread, NULL, NULL, NULL, CONFIG_MQTT_PRIORITY, 0,0);

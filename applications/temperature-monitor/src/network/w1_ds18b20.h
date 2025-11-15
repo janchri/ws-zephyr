@@ -1,5 +1,5 @@
-#ifndef ONEWIRE_H
-#define ONEWIRE_H
+#ifndef WS_DS18B20_H
+#define WS_DS18B20_H
 
 #include <zephyr/drivers/w1.h>
 #include <zephyr/drivers/sensor/w1_sensor.h>
@@ -10,5 +10,6 @@ struct ds18b20_value{
     struct sensor_value temp;
 	float tempf;
 };
+ZBUS_CHAN_DECLARE(ds18b20_value_chan);
 
-#endif /* ONEWIRE_H */
+#endif /* WS_DS18B20_H */

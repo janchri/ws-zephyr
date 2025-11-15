@@ -15,6 +15,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/net/mqtt.h>
+#include <zephyr/zbus/zbus.h>
 
 #include "w1_ds18b20.h"
 
@@ -26,6 +27,13 @@ LOG_MODULE_REGISTER(w1_ds18b20, CONFIG_LOG_DEFAULT_LEVEL);
 
 #define POLL_INTERVAL_SECONDS 60
 
+ZBUS_CHAN_DEFINE(ds18b20_value_chan,
+                 struct ds18b20_value,
+                 NULL,
+                 NULL,
+                 ZBUS_OBSERVERS(mqtt_conn_sub) ,
+                 ZBUS_MSG_INIT()
+                );
 struct ds18b20_config
 {
     struct w1_rom w1_rom;
@@ -39,8 +47,6 @@ struct ds18b20_sensor{
 const struct device *const w1_dev = DEVICE_DT_GET(DT_NODELABEL(w1));
 const struct device *const ds18b20_dev = DEVICE_DT_GET_ANY(maxim_ds18b20);
 
-ZBUS_CHAN_DEFINE(ds18b20_value_chan, struct ds18b20_value, NULL, NULL, ZBUS_OBSERVERS(mqtt_conn_sub), ZBUS_MSG_INIT(0));
-ZBUS_CHAN_DECLARE(ds18b20_value_chan);
 
 static struct ds18b20_sensor sensors[CONFIG_DS18B20_MAX_DEVICES];
 static int sensor_count;
