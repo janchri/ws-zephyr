@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WirbelWind</title>
+<style>
+:root {
+	--bg: #f4f2ee; --card: #fff; --fg: #1f2328; --muted: #6a6f76; --line: #e3e0da;
+	--accent: #2f6f8f; --accent-fg: #fff; --hl: #e6f0f4; --danger: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #15171a; --card: #1e2125; --fg: #e8e6e3; --muted: #9aa0a6; --line: #30343a;
+		--accent: #6fb3d2; --accent-fg: #0d1b22; --hl: #1f3440; --danger: #f2827a;
+	}
+}
+* { box-sizing: border-box; }
+body {
+	margin: 0; background: var(--bg); color: var(--fg);
+	font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 640px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 20px; margin: 4px 0 16px; letter-spacing: .02em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+button {
+	font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg);
+	border-radius: 8px; padding: 6px 12px; cursor: pointer; min-height: 36px;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.icon { padding: 4px 10px; }
+button.icon svg { width: 16px; height: 16px; display: block; fill: currentColor; }
+li.sel button.play { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.danger { color: var(--danger); }
+button:disabled { opacity: .4; cursor: default; }
+input[type=text] {
+	font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+	border-radius: 8px; padding: 6px 10px; min-height: 36px; min-width: 0; flex: 1;
+}
+select {
+	font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+	border-radius: 8px; padding: 6px 10px; min-height: 36px; width: 100%;
+}
+input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.muted { color: var(--muted); }
+.title { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.controls { display: flex; gap: 8px; justify-content: center; margin: 12px 0; }
+.controls button { min-width: 72px; }
+ul { list-style: none; margin: 0; padding: 0; }
+li { display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+li:last-child { border-bottom: 0; }
+li .name { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: default; }
+li.link .name { cursor: pointer; }
+li.sel { background: var(--hl); border-radius: 6px; }
+.detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+#msg { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--fg); color: var(--bg);
+	padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#msg.show { opacity: .92; }
+</style>
+</head>
+<body>
+<main>
+<h1>WirbelWind</h1>
+
+<section id="now">
+	<h2>Now playing</h2>
+	<div class="title" id="np-title">–</div>
+	<div class="muted" id="np-track"></div>
+	<div class="controls">
+		<button id="seek-back" title="Back 30 s">−30 s</button>
+		<button class="primary" data-cmd="next" title="Like a short press of the button">Next track</button>
+		<button id="seek-fwd" title="Forward 30 s">+30 s</button>
+	</div>
+	<div class="controls">
+		<button data-cmd="reset" title="Like a long press of the button">Restart playlist</button>
+	</div>
+	<div class="row" style="flex-wrap: nowrap"><span class="muted">Volume</span><input type="range" id="volume" min="0" max="20"><span id="vol-val"></span></div>
+</section>
+
+<section>
+	<h2>Playlists</h2>
+	<select id="pl-select" aria-label="Playlist"></select>
+	<div class="detail" id="pl-detail" hidden>
+		<div class="row"><input type="text" id="pl-name" aria-label="Playlist name"><button class="danger" id="pl-delete">Delete</button></div>
+		<p class="muted" id="pl-info"></p>
+		<ul id="pl-tracks"></ul>
+	</div>
+	<div class="detail row">
+		<input type="text" id="new-uuid" placeholder="Tag UID (hex)">
+		<input type="text" id="new-name" placeholder="Name">
+		<button id="new-pl">Create</button>
+	</div>
+	<div class="detail row">
+		<span class="muted" style="flex: 1">Forget where every playlist stopped (like holding the button for 10 s)</span>
+		<button class="danger" id="reset-all">Reset all</button>
+	</div>
+</section>
+
+<section>
+	<h2>Files</h2>
+	<div class="row muted" id="cwd"></div>
+	<ul id="files"></ul>
+	<div class="detail row">
+		<input type="text" id="mkdir-name" placeholder="New folder">
+		<button id="mkdir">Create</button>
+		<button class="primary" id="upload-btn">Upload…</button>
+		<input type="file" id="upload" multiple accept=".mp3,audio/mpeg" hidden>
+	</div>
+</section>
+</main>
+<div id="msg"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let status = {}, sel = null, selPl = null, cwd = '/Music', started = false;
+
+function h(tag, props, ...kids) {
+	const e = document.createElement(tag);
+	Object.assign(e, props || {});
+	for (const k of kids) e.append(k);
+	return e;
+}
+
+function toast(text) {
+	const m = $('#msg');
+	m.textContent = text;
+	m.classList.add('show');
+	clearTimeout(toast.t);
+	toast.t = setTimeout(() => m.classList.remove('show'), 2500);
+}
+
+async function api(method, url, body) {
+	const r = await fetch(url, {
+		method,
+		body: body instanceof Blob ? body : body && JSON.stringify(body),
+	});
+	const data = await r.json().catch(() => ({}));
+	if (!r.ok) throw new Error(`${method} ${url}: ${r.status} ${data.error ?? ''}`);
+	return data;
+}
+
+const run = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message); } };
+const base = p => p.split('/').pop();
+const time = ms => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+const q = (k, v) => `?${k}=${encodeURIComponent(v)}`;
+const control = (cmd, arg = 0) => api('POST', '/api/control', { cmd, arg });
+
+/* Now playing */
+
+async function refreshStatus() {
+	const old = status;
+	status = await api('GET', '/api/status');
+	$('#np-title').textContent = status.present ? status.name : 'No tag on the box';
+	document.querySelectorAll('#now .controls button').forEach(b => b.disabled = !status.present || !status.tracks);
+	$('#np-track').textContent = status.tracks
+		? `${status.track + 1}/${status.tracks} · ${base(status.path)} · ${time(status.pos)} · ${status.present ? status.state : 'paused, tag removed'}`
+		: '';
+	const vol = $('#volume');
+	vol.max = status.volume_max;
+	if (document.activeElement !== vol) vol.value = status.volume;
+	$('#vol-val').textContent = status.volume;
+	if (started && status.present && (!old.present || old.uuid !== status.uuid)) {
+		/* A tag was placed: show its playlist */
+		await selectPlaylist(status.uuid);
+	} else if (started && sel && old.present !== status.present) {
+		/* Tag removed: the playlist now shows where it will continue */
+		await selectPlaylist(sel);
+	} else if (old.uuid !== status.uuid || old.track !== status.track || old.state !== status.state) {
+		renderTracks();
+	}
+}
+
+document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = run(() => control(b.dataset.cmd)));
+$('#seek-back').onclick = run(() => control('seek', Math.max(0, Math.floor(status.pos / 1000) - 30)));
+$('#seek-fwd').onclick = run(() => control('seek', Math.floor(status.pos / 1000) + 30));
+$('#volume').onchange = run(e => control('volume', +e.target.value));
+
+/* Playlists */
+
+async function loadPlaylists() {
+	const list = await api('GET', '/api/playlists');
+	list.sort((a, b) => a.name.localeCompare(b.name));
+	$('#pl-select').replaceChildren(
+		h('option', { value: '', textContent: list.length ? 'Choose a playlist…' : 'No playlists yet: place a tag on the box', disabled: true }),
+		...list.map(p => h('option', { value: p.uuid,
+			textContent: `${p.name} (${p.tracks} tracks)${status.present && status.uuid === p.uuid ? ' – on the box' : ''}` })));
+	$('#pl-select').value = sel ?? '';
+}
+
+$('#pl-select').onchange = run(e => selectPlaylist(e.target.value));
+
+async function selectPlaylist(uuid) {
+	sel = uuid;
+	selPl = uuid ? await api('GET', '/api/playlist' + q('uuid', uuid)) : null;
+	history.replaceState(null, '', uuid ? '#pl=' + uuid : '#');
+	$('#pl-detail').hidden = !selPl;
+	await loadPlaylists();
+	if (!selPl) return;
+	$('#pl-name').value = selPl.name;
+	renderTracks();
+	renderFiles();
+}
+
+const isActive = () => status.present && status.uuid === sel;
+/* The highlighted track: playing now, or where the playlist continues */
+const curTrack = () => isActive() ? status.track : selPl.resume.track;
+
+const ICONS = {
+	play: '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>',
+	pause: '<svg viewBox="0 0 16 16"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>',
+};
+
+/* Play / pause button of a track */
+function trackButton(i) {
+	const current = isActive() && i === status.track;
+	let icon = 'play', title, action;
+	if (current && status.state === 'playing') {
+		icon = 'pause'; title = 'Pause'; action = () => control('pause');
+	} else if (current && status.state === 'paused') {
+		title = 'Continue'; action = () => control('resume');
+	} else {
+		title = isActive() ? 'Play this track from the beginning'
+			: 'Start with this track when the tag is placed';
+		action = () => cue(i);
+	}
+	return h('button', { className: 'icon play', innerHTML: ICONS[icon], title, ariaLabel: title,
+		onclick: run(async () => { await action(); await refreshStatus(); }) });
+}
+
+function renderTracks() {
+	if (!selPl) return;
+	const cur = curTrack(), pos = selPl.resume.pos;
+	$('#pl-info').textContent = !selPl.tracks.length ? 'Empty. Add music in the file browser below.'
+		: isActive() ? 'On the box now.'
+		: `Continues with track ${cur + 1}${pos ? ' at ' + time(pos) : ''} when the tag is placed.`;
+	$('#pl-tracks').replaceChildren(...selPl.tracks.map((t, i) => h('li', {
+			className: i === cur ? 'sel' : '', title: t },
+		h('span', { className: 'muted', textContent: i + 1 }),
+		h('span', { className: 'name', textContent: base(t) }),
+		trackButton(i),
+		h('button', { className: 'icon danger', textContent: '✕', title: 'Remove from playlist',
+			onclick: run(() => updatePlaylist({ remove: i })) }))));
+}
+
+async function updatePlaylist(change) {
+	selPl = await api('POST', '/api/playlist', { uuid: sel, ...change });
+	renderTracks();
+	await loadPlaylists();
+}
+
+/* Play a track from its start: now if the tag is on the box, else next time it is placed */
+async function cue(track) {
+	const active = isActive();
+	await updatePlaylist({ track });
+	if (!active) toast(`"${selPl.name}" starts with track ${track + 1} when its tag is placed`);
+	await refreshStatus();
+}
+
+$('#pl-name').onchange = run(e => updatePlaylist({ name: e.target.value }));
+$('#pl-delete').onclick = run(async () => {
+	if (!confirm(`Delete playlist "${selPl.name}"? The music files stay on the card.`)) return;
+	await api('DELETE', '/api/playlist' + q('uuid', sel));
+	await selectPlaylist(null);
+});
+$('#reset-all').onclick = run(async () => {
+	if (!confirm('Forget the positions of all playlists? They all start with their first track again.')) return;
+	await control('reset_all');
+	toast('All playlists start from the beginning again');
+	if (sel) await selectPlaylist(sel);
+});
+$('#new-pl').onclick = run(async () => {
+	const uuid = $('#new-uuid').value.trim().toLowerCase(), name = $('#new-name').value.trim();
+	if (!uuid) return toast('Enter the UID of the tag');
+	await api('POST', '/api/playlist', name ? { uuid, name } : { uuid });
+	$('#new-uuid').value = $('#new-name').value = '';
+	await selectPlaylist(uuid);
+});
+
+/* Files */
+
+async function renderFiles() {
+	const files = await api('GET', '/api/files' + q('path', cwd));
+	files.sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name));
+
+	const parts = cwd.split('/').filter(Boolean);
+	$('#cwd').replaceChildren(...[''].concat(parts).map((p, i) => {
+		const path = '/' + parts.slice(0, i).join('/');
+		return h('button', { className: 'icon', textContent: p || 'SD', onclick: run(() => cd(path)) });
+	}));
+
+	const add = sel ? `Add to "${selPl?.name ?? sel}"` : 'Select a playlist first';
+	$('#files').replaceChildren(...files.filter(f => !f.name.startsWith('.')).map(f => {
+		const path = (cwd === '/' ? '' : cwd) + '/' + f.name;
+		const li = h('li', { className: f.dir ? 'link' : '' },
+			h('span', { className: 'name', textContent: f.dir ? `📁 ${f.name}` : f.name }),
+			h('span', { className: 'muted', textContent: f.dir ? '' : `${(f.size / 1048576).toFixed(1)} MB` }),
+			h('button', { className: 'icon', textContent: '+', title: add, disabled: !sel || (!f.dir && !/\.mp3$/i.test(f.name)),
+				onclick: run(async e => { e.stopPropagation(); await updatePlaylist({ add: path }); toast(`Added to ${selPl.name}`); }) }),
+			h('button', { className: 'icon danger', textContent: '✕', title: 'Delete',
+				onclick: run(async e => {
+					e.stopPropagation();
+					if (!confirm(`Delete ${f.name}?`)) return;
+					await api('DELETE', '/api/files' + q('path', path));
+					await renderFiles();
+				}) }));
+		if (f.dir) li.onclick = run(() => cd(path));
+		return li;
+	}));
+	if (!$('#files').children.length) $('#files').append(h('li', { className: 'muted', textContent: 'Empty folder' }));
+}
+
+async function cd(path) { cwd = path || '/'; await renderFiles(); }
+
+$('#mkdir').onclick = run(async () => {
+	const name = $('#mkdir-name').value.trim();
+	if (!name) return;
+	await api('POST', '/api/files' + q('path', (cwd === '/' ? '' : cwd) + '/' + name));
+	$('#mkdir-name').value = '';
+	await renderFiles();
+});
+/* The box stores names in an 8 bit code page: keep them ASCII so they look the same on a PC */
+const asciiName = n => n.replace(/[äöüÄÖÜß]/g, c => ({ ä: 'ae', ö: 'oe', ü: 'ue', Ä: 'Ae', Ö: 'Oe', Ü: 'Ue', ß: 'ss' })[c])
+	.normalize('NFD').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '');
+
+$('#upload-btn').onclick = () => $('#upload').click();
+$('#upload').onchange = run(async e => {
+	const files = [...e.target.files];
+	for (const [i, f] of files.entries()) {
+		toast(`Uploading ${f.name} (${i + 1}/${files.length})…`);
+		await api('PUT', '/api/files' + q('path', (cwd === '/' ? '' : cwd) + '/' + asciiName(f.name)), f);
+	}
+	e.target.value = '';
+	toast(`Uploaded ${files.length} file(s)`);
+	await renderFiles();
+});
+
+run(async () => {
+	await refreshStatus();
+	const m = location.hash.match(/pl=([\w-]+)/);
+	await selectPlaylist(m ? m[1] : status.present ? status.uuid : null);
+	started = true;
+	await renderFiles();
+	setInterval(run(refreshStatus), 1000);
+})();
+</script>
+</body>
+</html>

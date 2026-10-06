@@ -8,7 +8,7 @@ manifest:
   defaults:
     remote: zephyrproject
 
-  # further "remotes" 
+  # further "remotes"
   remotes:
     - name: zephyrproject
       url-base: https://github.com/zephyrproject-rtos
@@ -17,16 +17,22 @@ manifest:
     path: ws-zephyr
 
   projects:
-    - name: zephyr
-      path: zephyr
-      remote: zephyrproject
-      repo-path: zephyr
-      revision: main
 
-      import:
-        # Keep this list sorted alphabetically.
-        name-allowlist:
-          - cmsis_6
-          - hal_espressif
-          - mbedtls
-          - segger
+  - name: zephyr
+    path: zephyr
+    remote: zephyrproject
+    repo-path: zephyr
+    revision: v4.4.0
+
+    import:
+      # Keep this list sorted alphabetically.
+      name-allowlist:
+        - cmsis_6
+        - fatfs
+        - hal_espressif
+        - mbedtls
+        - segger
+        - hal_st
+        - hal_stm32
+        - hal_nordic
+        - tf-psa-crypto

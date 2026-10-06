@@ -1,0 +1,103 @@
+# Copyright 2025 Christoph Jans
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "WirbelWind"
+
+menu "WirbelWind"
+
+module = WW
+module-str = wirbelwind
+source "subsys/logging/Kconfig.template.log_config"
+
+config WW_SD_MOUNT_POINT
+	string "Mount point of the SD card"
+	default "/SD:"
+	help
+	  FatFs mount point. The part between '/' and ':' must match the
+	  disk name of the SD card (disk-name of the flash-disk on native_sim,
+	  "SD" for the sdmmc disk on real hardware).
+
+config WW_PLAYLIST_MAX_TRACKS
+	int "Maximum number of tracks per playlist"
+	default 64
+
+config WW_PLAYLIST_BUF_SIZE
+	int "Buffer size for one playlist (JSON + strings)"
+	default 6144
+
+config WW_VOLUME_MAX
+	int "Maximum volume step"
+	default 20
+
+config WW_VOLUME_DEFAULT
+	int "Volume on boards without a volume potentiometer"
+	default 8
+
+config WW_BUTTON_LONG_MS
+	int "Button: minimum duration of a long press (restart playlist) [ms]"
+	default 1000
+
+config WW_BUTTON_LONGLONG_MS
+	int "Button: minimum duration of a very long press (reset all playlists) [ms]"
+	default 10000
+
+config WW_RESUME_SAVE_INTERVAL_S
+	int "Interval for persisting the play position while playing [s]"
+	default 30
+
+config WW_CONTROLLER_STACK_SIZE
+	int "Controller thread stack size"
+	default 4096
+
+config WW_PLAYER_STACK_SIZE
+	int "Player thread stack size"
+	default 32768
+	help
+	  minimp3 keeps its ~16 KiB scratch area on the stack.
+
+config WW_PLAYER_PRIORITY
+	int "Player thread priority"
+	default 4
+
+config WW_PLAYER_INBUF_SIZE
+	int "MP3 input buffer size"
+	default 16384
+
+config WW_TAG_READER_SIM
+	bool "Simulated tag reader (shell: ww tag place/remove)"
+	default y if BOARD_NATIVE_SIM
+	depends on SHELL
+
+config WW_KEYS_SIM
+	bool "Simulated button and volume pot (shell: ww button, ww pot)"
+	default y if BOARD_NATIVE_SIM
+	depends on SHELL && GPIO_EMUL && ADC_EMUL
+
+config WW_AUDIO_NATIVE
+	bool "Host audio output on native_sim"
+	default y
+	depends on ARCH_POSIX
+	help
+	  Pipes the PCM to a host command (--audio_cmd) or writes it to a
+	  file (--audio_file).
+
+config WW_HTTP
+	bool "Web interface"
+	default y
+	depends on HTTP_SERVER
+
+if WW_HTTP
+
+config WW_HTTP_PORT
+	int "Web interface TCP port"
+	default 80
+
+config WW_HTTP_RESPONSE_SIZE
+	int "Buffer for one JSON response"
+	default 8192
+
+endif
+
+endmenu
+
+source "Kconfig.zephyr"
