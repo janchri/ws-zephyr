@@ -3,28 +3,26 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * The box logic: tags select playlists, keys control playback, the position
- * of every playlist is remembered (settings in internal flash, independent of
- * the SD card).
+ * The box logic: tags select playlists, the button and the user interfaces
+ * control playback, the position of every playlist is remembered.
  */
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/settings/settings.h>
 #include <zephyr/sys/util.h>
 
-#include "wirbelwind.h"
+#include "controller.h"
+#include "player.h"
+#include "playlist.h"
+#include "resume.h"
 
 LOG_MODULE_DECLARE(ww, CONFIG_WW_LOG_LEVEL);
 
-#define POT_NODE  DT_NODELABEL(volume_pot)
-#define POT_RANGE DT_PROP(DT_CHILD(POT_NODE, axis), out_max)
+/* With a volume pot, the volume is 0 until the pot reports its position */
+#define HAS_POT DT_NODE_EXISTS(DT_NODELABEL(volume_pot))
 
 static K_MUTEX_DEFINE(ctl_lock);
 static struct ww_playlist pl;
@@ -33,108 +31,6 @@ static bool tag_present;
 static size_t cur_track;
 static uint8_t volume;
 static int64_t last_save;
-
-/* Persistent state */
-
-#define KEY_RESUME "ww/pos"
-
-struct read_ctx {
-	void *dst;
-	size_t len;
-	bool found;
-};
-
-static int read_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg,
-		   void *param)
-{
-	struct read_ctx *ctx = param;
-
-	/* Only accept the exact key, not children of it */
-	if (key != NULL || len != ctx->len) {
-		return 0;
-	}
-	if (read_cb(cb_arg, ctx->dst, ctx->len) == ctx->len) {
-		ctx->found = true;
-	}
-
-	return 0;
-}
-
-static bool read_value(const char *key, void *dst, size_t len)
-{
-	struct read_ctx ctx = {.dst = dst, .len = len};
-
-	settings_load_subtree_direct(key, read_cb, &ctx);
-
-	return ctx.found;
-}
-
-void ww_resume_load(const char *uuid, struct ww_resume *r)
-{
-	char key[sizeof(KEY_RESUME) + WW_UID_STR_LEN];
-
-	snprintf(key, sizeof(key), KEY_RESUME "/%s", uuid);
-	if (!read_value(key, r, sizeof(*r))) {
-		memset(r, 0, sizeof(*r));
-	}
-}
-
-int ww_resume_save(const char *uuid, const struct ww_resume *r)
-{
-	char key[sizeof(KEY_RESUME) + WW_UID_STR_LEN];
-
-	snprintf(key, sizeof(key), KEY_RESUME "/%s", uuid);
-
-	return settings_save_one(key, r, sizeof(*r));
-}
-
-int ww_resume_clear(const char *uuid)
-{
-	char key[sizeof(KEY_RESUME) + WW_UID_STR_LEN];
-
-	snprintf(key, sizeof(key), KEY_RESUME "/%s", uuid);
-
-	return settings_delete(key);
-}
-
-#define CLEAR_BATCH 16
-
-struct clear_ctx {
-	char keys[CLEAR_BATCH][WW_UID_STR_LEN];
-	size_t count;
-};
-
-static int collect_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg,
-		      void *param)
-{
-	struct clear_ctx *ctx = param;
-
-	if (key != NULL && ctx->count < CLEAR_BATCH) {
-		strncpy(ctx->keys[ctx->count], key, WW_UID_STR_LEN - 1);
-		ctx->keys[ctx->count][WW_UID_STR_LEN - 1] = '\0';
-		ctx->count++;
-	}
-
-	return 0;
-}
-
-/* Forget the positions of all playlists */
-static void resume_clear_all(void)
-{
-	struct clear_ctx ctx;
-
-	/* Collect in batches, deleting while iterating is not allowed */
-	do {
-		ctx.count = 0;
-		settings_load_subtree_direct(KEY_RESUME, collect_cb, &ctx);
-		for (size_t i = 0; i < ctx.count; i++) {
-			ww_resume_clear(ctx.keys[i]);
-		}
-	} while (ctx.count == CLEAR_BATCH);
-
-	/* Volume stored by older versions */
-	settings_delete("ww/volume");
-}
 
 /* Box logic */
 
@@ -238,7 +134,7 @@ static void reset_playlist(void)
 static void reset_all(void)
 {
 	LOG_INF("Forgetting the positions of all playlists");
-	resume_clear_all();
+	ww_resume_clear_all();
 	if (pl_loaded && tag_present && pl.d.num_tracks > 0) {
 		start_track(0, 0);
 	} else {
@@ -398,66 +294,6 @@ static void on_cmd(enum ww_cmd cmd, int32_t arg)
 	}
 }
 
-/*
- * The button (gpio-keys, any key code): short, long and very long presses,
- * measured at release.
- */
-
-static void button_cb(struct input_event *evt, void *user_data)
-{
-	static int64_t pressed_at;
-	struct ww_event ev = {.type = WW_EV_BUTTON};
-	int64_t duration;
-
-	if (evt->type != INPUT_EV_KEY) {
-		return;
-	}
-	if (evt->value) {
-		pressed_at = k_uptime_get();
-		return;
-	}
-
-	duration = k_uptime_get() - pressed_at;
-	if (duration >= CONFIG_WW_BUTTON_LONGLONG_MS) {
-		ev.press = WW_PRESS_LONGLONG;
-	} else if (duration >= CONFIG_WW_BUTTON_LONG_MS) {
-		ev.press = WW_PRESS_LONG;
-	} else {
-		ev.press = WW_PRESS_SHORT;
-	}
-	LOG_DBG("Button released after %lld ms", duration);
-	ww_event_post(&ev);
-}
-
-INPUT_CALLBACK_DEFINE(NULL, button_cb, NULL);
-
-/*
- * The volume potentiometer (analog-axis, 0..out-max). With some hysteresis
- * (half a step + 1 %), so a pot resting on a step boundary does not flicker.
- */
-
-#if DT_NODE_EXISTS(POT_NODE)
-static void pot_cb(struct input_event *evt, void *user_data)
-{
-	static int cur = -1;
-	/* one volume step is POT_RANGE units */
-	int pos = evt->value * CONFIG_WW_VOLUME_MAX;
-	int center = cur * POT_RANGE;
-
-	if (evt->type != INPUT_EV_ABS) {
-		return;
-	}
-	if (cur >= 0 && abs(pos - center) <= POT_RANGE / 2 + POT_RANGE * CONFIG_WW_VOLUME_MAX / 100) {
-		return;
-	}
-
-	cur = DIV_ROUND_CLOSEST(pos, POT_RANGE);
-	ww_event_post_cmd(WW_CMD_VOLUME, cur);
-}
-
-INPUT_CALLBACK_DEFINE(DEVICE_DT_GET(POT_NODE), pot_cb, NULL);
-#endif
-
 static void player_done(int err)
 {
 	struct ww_event ev = {.type = WW_EV_TRACK_DONE};
@@ -512,8 +348,7 @@ int ww_controller_init(void)
 {
 	int ret;
 
-	/* The pot reports its position once it differs from 0 */
-	volume = DT_NODE_EXISTS(POT_NODE) ? 0 : CONFIG_WW_VOLUME_DEFAULT;
+	volume = HAS_POT ? 0 : CONFIG_WW_VOLUME_DEFAULT;
 	ww_player_set_volume(volume);
 	LOG_INF("Volume %u/%u", volume, CONFIG_WW_VOLUME_MAX);
 

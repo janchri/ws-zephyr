@@ -63,23 +63,107 @@ config WW_PLAYER_INBUF_SIZE
 	int "MP3 input buffer size"
 	default 16384
 
-config WW_TAG_READER_SIM
-	bool "Simulated tag reader (shell: ww tag place/remove)"
-	default y if BOARD_NATIVE_SIM
-	depends on SHELL
+config WW_RFID
+	bool "RFID reader: MFRC522 (rfid/)"
+	default y
+	depends on DT_HAS_NXP_MFRC522_ENABLED
+	select SPI
 
-config WW_KEYS_SIM
-	bool "Simulated button and volume pot (shell: ww button, ww pot)"
+if WW_RFID
+
+config WW_RFID_INIT_PRIORITY
+	int "MFRC522 driver init priority"
+	default 90
+	help
+	  Must be after the SPI controller (and its emulators on native_sim).
+
+config WW_RFID_POLL_MS
+	int "Poll interval of the tag reader [ms]"
+	default 250
+
+config WW_RFID_REMOVE_POLLS
+	int "Polls without the card before it counts as removed"
+	default 3
+
+endif
+
+config WW_RFID_EMUL
+	bool "Emulated MFRC522 with a card placed from the shell (native/mfrc522_emul.c)"
+	default y if BOARD_NATIVE_SIM
+	depends on WW_RFID && EMUL && SPI_EMUL && SHELL
+	help
+	  "ww tag place <uid>" / "ww tag remove" put a card on the emulated
+	  reader, so the real driver and tag reader run in the simulation.
+
+config WW_TAG_SHELL
+	bool "Shell commands that post tag events directly (ww tag place/remove)"
+	default y
+	depends on SHELL && !WW_RFID_EMUL
+	help
+	  Bypasses the RFID reader, useful on real hardware to try playlists
+	  without tags.
+
+config WW_SIM
+	bool "Simulated button and volume pot (native/sim.c)"
 	default y if BOARD_NATIVE_SIM
 	depends on SHELL && GPIO_EMUL && ADC_EMUL
+	help
+	  Shell commands "ww button" and "ww pot" that drive the controls of
+	  the box through the GPIO and ADC emulators.
 
 config WW_AUDIO_NATIVE
-	bool "Host audio output on native_sim"
+	bool "Host audio output on native_sim (native/audio.c)"
 	default y
 	depends on ARCH_POSIX
 	help
 	  Pipes the PCM to a host command (--audio_cmd) or writes it to a
 	  file (--audio_file).
+
+config WW_AUDIO_AC101
+	bool "ESP32-A1S audio output: I2S + AC101 codec (esp32a1s/)"
+	default y
+	depends on DT_HAS_X_POWERS_AC101_ENABLED
+	select I2S
+	select I2C
+
+if WW_AUDIO_AC101
+
+config WW_AC101_HP_VOLUME
+	int "AC101 headphone output level (0..63)"
+	range 0 63
+	default 40
+
+config WW_AC101_SPK_VOLUME
+	int "AC101 speaker output level (0..31)"
+	range 0 31
+	default 20
+
+endif
+
+config WW_WIFI_AP
+	bool "WiFi hotspot at startup when no tag is on the box (wifi.c)"
+	default y
+	depends on WIFI && NET_DHCPV4_SERVER
+
+if WW_WIFI_AP
+
+config WW_WIFI_AP_SSID
+	string "Hotspot name"
+	default "music.Box"
+
+config WW_WIFI_AP_PSK
+	string "Hotspot password (8..63 characters, empty = open network)"
+	default ""
+
+config WW_WIFI_AP_IP
+	string "Address of the box in the hotspot (/24)"
+	default "192.168.4.1"
+
+config WW_WIFI_AP_DELAY_MS
+	int "Time after startup to wait for a tag before opening the hotspot [ms]"
+	default 3000
+
+endif
 
 config WW_HTTP
 	bool "Web interface"

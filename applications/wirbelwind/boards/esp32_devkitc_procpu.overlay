@@ -1,0 +1,131 @@
+/*
+ * Copyright (c) 2025 Christoph Jans <jans.christoph@gmail.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Ai-Thinker ESP32 Audio Kit v2.2 (ESP32-A1S with AC101 codec) on top of
+ * esp32_devkitc. Pins as used by the Arduino version of the box.
+ *
+ *   I2S0   BCLK 27, LRCK 26, DOUT 25 (to the codec), MCLK 0 (see esp32a1s/audio.c)
+ *   I2C0   SDA 33, SCL 32: AC101 at 0x1a
+ *   PA     21 (speaker amplifier enable)
+ *   SD     4 bit: CLK 14, CMD 15, D0 2, D1 4, D2 12, D3 13
+ *   Button 22
+ *   Pot    34 (ADC1 channel 6)            <- placeholder, adjust to the wiring
+ *   RFID   MFRC522 on VSPI: SCK 18, MISO 19, MOSI 23, CS 5 (spi3)
+ *   WiFi   hotspot "music.Box" at startup without a tag (wifi.c)
+ */
+
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/i2c/i2c.h>
+
+/ {
+	/* Volume potentiometer, see inputs.c */
+	volume_pot: volume_pot {
+		compatible = "analog-axis";
+		poll-period-ms = <50>;
+
+		axis {
+			io-channels = <&adc0 6>;
+			in-min = <0>;
+			in-max = <4095>;
+			out-min = <0>;
+			out-max = <1000>;
+			zephyr,axis = <INPUT_ABS_THROTTLE>;
+		};
+	};
+};
+
+/* The base board's BOOT button (GPIO0 is MCLK here) becomes the box button */
+&button0 {
+	gpios = <&gpio0 22 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+	label = "Button";
+	zephyr,code = <INPUT_KEY_NEXTSONG>;
+};
+
+&i2c0_default {
+	group1 {
+		pinmux = <I2C0_SDA_GPIO33>,
+			 <I2C0_SCL_GPIO32>;
+	};
+};
+
+&i2c0 {
+	clock-frequency = <I2C_BITRATE_FAST>;
+	sda-gpios = <&gpio1 1 GPIO_OPEN_DRAIN>;
+	scl-gpios = <&gpio1 0 GPIO_OPEN_DRAIN>;
+
+	ac101: codec@1a {
+		compatible = "x-powers,ac101";
+		reg = <0x1a>;
+		i2s = <&i2s0>;
+		pa-gpios = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&i2s0_default {
+	group1 {
+		pinmux = <I2S0_O_BCK_GPIO27>,
+			 <I2S0_O_WS_GPIO26>,
+			 <I2S0_O_SD_GPIO25>;
+	};
+};
+
+&i2s0 {
+	status = "okay";
+	interrupts = <I2S0_INTR_SOURCE IRQ_DEFAULT_PRIORITY 0>;
+	interrupt-names = "tx";
+};
+
+/* Its default pins are the SD card here */
+&spi2 {
+	status = "disabled";
+};
+
+&sdhc1 {
+	status = "okay";
+
+	max-bus-freq = <20000000>;
+	bus-width = <4>;
+
+	clk-pin = <14>;
+	cmd-pin = <15>;
+	d0-pin = <2>;
+	d1-pin = <4>;
+	d2-pin = <12>;
+	d3-pin = <13>;
+
+	mmc {
+		compatible = "zephyr,sdmmc-disk";
+		disk-name = "SD";
+		status = "okay";
+	};
+};
+
+&wifi {
+	status = "okay";
+};
+
+/* MFRC522 on VSPI (SCK 18, MISO 19, MOSI 23, hardware CS 5), no reset pin */
+&spi3 {
+	rfid: rfid@0 {
+		compatible = "nxp,mfrc522";
+		reg = <0>;
+		spi-max-frequency = <4000000>;
+	};
+};
+
+&adc0 {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@6 {
+		reg = <6>;
+		/* 12 dB attenuation: 0..3.3 V */
+		zephyr,gain = "ADC_GAIN_1_4";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};

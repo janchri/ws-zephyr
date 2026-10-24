@@ -1,0 +1,13 @@
+# Copyright (c) 2025 Christoph Jans <jans.christoph@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: NXP MFRC522 13.56 MHz RFID reader (ISO 14443A), SPI interface
+
+compatible: "nxp,mfrc522"
+
+include: spi-device.yaml
+
+properties:
+  reset-gpios:
+    type: phandle-array
+    description: NRSTPD pin (active low reset / power down), optional

@@ -15,7 +15,9 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/logging/log.h>
 
-#include "wirbelwind.h"
+#include "events.h"
+#include "playlist.h"
+#include "storage.h"
 
 LOG_MODULE_DECLARE(ww, CONFIG_WW_LOG_LEVEL);
 

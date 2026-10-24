@@ -17,7 +17,9 @@
 #define MINIMP3_NO_SIMD
 #include <minimp3.h>
 
-#include "wirbelwind.h"
+#include "audio.h"
+#include "player.h"
+#include "storage.h"
 
 LOG_MODULE_DECLARE(ww, CONFIG_WW_LOG_LEVEL);
 

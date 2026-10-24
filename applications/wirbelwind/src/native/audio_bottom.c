@@ -11,7 +11,7 @@
 #include <string.h>
 
 /*
- * Plain C types only, the embedded side declares these in audio_native.c.
+ * Plain C types only, the Zephyr side declares these in audio.c.
  * cmd: a shell command reading raw s16le PCM from stdin, "{rate}" and "{ch}"
  * get replaced; file: raw PCM is appended.
  */

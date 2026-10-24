@@ -6,16 +6,36 @@ stopped last time; remove the tag and playback pauses.
 
 ## Architecture
 
-| File                        | Job                                                        | Arduino original |
-|-----------------------------|------------------------------------------------------------|------------------|
-| `src/wirbelwind.h`          | All internal interfaces                                    |                  |
-| `src/main.c`                | Startup, event queue, SD card mount                        | `Board`, `EventQueue` |
-| `src/controller.c`          | Box logic (tag → playlist, keys, resume), button presses, persistent state (NVS) | `loop()`, `Button` |
-| `src/playlist.c`            | JSON playlists on the SD card, same format/location as before | `Playlist`    |
-| `src/player.c`              | Player thread: SD → minimp3 → volume → audio output        | `SD_Player`      |
-| `src/audio_native*.c`       | native_sim audio output (host side in `_bottom.c`)         | `AudioOutputI2S` |
-| `src/shell.c`               | `ww` shell; simulated RFID reader and keys on native_sim   | `Rfid`           |
-| `src/http.c`, `web/index.html` | REST API and web UI (embedded gzipped)                  | `Restserver`, `www/` |
+Every module has its own header with just its interface. Code that only exists
+for a platform lives in its own folder (`src/native/`, `src/esp32a1s/`).
+
+| Module                       | Job                                                        | Arduino original |
+|------------------------------|------------------------------------------------------------|------------------|
+| `main.c`                     | Startup                                                    | `setup()`        |
+| `events.c/.h`                | Event queue: tags, button, end of track, UI commands       | `EventQueue`     |
+| `controller.c/.h`            | Box logic: tag → playlist, button, resume, volume          | `loop()`         |
+| `inputs.c`                   | Button (gpio-keys) and volume pot (analog-axis) → events   | `Button`         |
+| `player.c/.h`                | Player thread: SD → minimp3 → volume → audio output        | `SD_Player`      |
+| `audio.h`                    | Audio output interface, implemented per platform           | `AudioOutputI2S` |
+| `playlist.c/.h`              | JSON playlists on the SD card, same format/location as before | `Playlist`    |
+| `resume.c/.h`                | Where each playlist continues (settings / NVS)             | tmp playlist (SPIFFS) |
+| `storage.c/.h`               | SD card mount and paths                                    | `Board`          |
+| `shell.c`                    | `ww` shell commands (on hardware also `ww tag`, bypassing the reader) |  |
+| `http.c/.h`, `web/index.html`| REST API and web UI (embedded gzipped)                     | `Restserver`, `www/` |
+| `wifi.c`                     | Hotspot at startup when no tag is on the box               | `Network`        |
+| `native/audio.c`             | native_sim audio output, Zephyr side                       |                  |
+| `native/audio_bottom.c`      | native_sim audio output, Linux side (popen/aplay)          |                  |
+| `resample.c/.h`              | Sample rate conversion to a fixed output rate              |                  |
+| `rfid/mfrc522.c/.h`          | MFRC522 driver (`dts/bindings/nxp,mfrc522.yaml`): card UID | `MFRC522` library |
+| `rfid/reader.c`              | Polls the reader → tag placed/removed events               | `Rfid`           |
+| `native/sim.c`               | Simulated button and pot (`ww button/pot`)                 |                  |
+| `native/mfrc522_emul.c`      | Emulated MFRC522 + card on the SPI emulator (`ww tag`)     |                  |
+| `esp32a1s/audio.c`           | ESP32-A1S audio output: I2S0 + MCLK on GPIO0               | `AudioOutputI2S` |
+| `esp32a1s/ac101.c/.h`        | AC101 codec over I2C (`dts/bindings/x-powers,ac101.yaml`)  | `AC101` library  |
+
+Dependencies point one way: the UIs (`shell`, `http`) and `inputs` post events
+or call the controller; the controller uses `player`, `playlist` and `resume`;
+the player uses `audio` and `storage`.
 
 Playlists: `/Music/.config/playlist_<uid>` with
 `{"uuid":"<uid>","name":"...","tracks":["/Music/...mp3", ...]}`.
@@ -62,7 +82,7 @@ Use ASCII file names (FatFs runs with code page 850, not UTF-8); the web upload
 converts names automatically (ä → ae, ß → ss, ...).
 
 ```
-uart:~$ ww tag place 0a1b2c3d
+uart:~$ ww tag place 0a1b2c3d     # card on the emulated reader: 4, 7 or 10 byte UID
 uart:~$ ww status
 uart:~$ ww button              # short press: next track
 uart:~$ ww button 1500         # hold 1.5 s: restart playlist
@@ -71,8 +91,43 @@ uart:~$ ww pot 40              # turn the volume pot to 40 %
 uart:~$ ww tag remove
 uart:~$ ww pl list | show <uid> | create <uid> [name] | add <uid> </Music/dir-or-mp3>
 uart:~$ ww pl name <uid> <name> | rm <uid> <nr> | del <uid>
-uart:~$ ww next | reset | reset-all | vol [n] | seek <s> | track <nr> | ls [path]
+uart:~$ ww next | reset | reset_all | vol [n] | seek <s> | track <nr> | ls [path]
 ```
+
+## ESP32-A1S Audio Kit (AC101)
+
+Ai-Thinker ESP32 Audio Kit v2.2 with the AC101 codec, built on top of the
+`esp32_devkitc` board (`boards/esp32_devkitc_procpu.overlay` has the pins).
+
+```sh
+west build -b esp32_devkitc/esp32/procpu -d build-esp32 ws-zephyr/applications/wirbelwind
+west flash -d build-esp32
+west espressif monitor          # or: picocom -b 115200 /dev/ttyUSB0
+```
+
+- Audio: I2S0 master (BCLK 27, LRCK 26, DOUT 25) → AC101 (I2C 33/32), MCLK on
+  GPIO0, speaker amplifier enable on GPIO21. The output always runs at 44.1 kHz
+  stereo; other rates and mono are converted (`resample.c`).
+  `CONFIG_WW_AC101_HP_VOLUME` / `CONFIG_WW_AC101_SPK_VOLUME` set the analog
+  levels, the pot/`ww vol` scales on top of that.
+- SD card: 4 bit SDMMC, FAT. The `sdcard.img` from `mk_sdcard.sh` can be
+  written to a card (`dd`), or copy music to a FAT32 card and create the
+  playlists with `ww pl create/add`.
+- Button on GPIO22, volume pot on GPIO34 (ADC1 ch 6, **placeholder**: adjust to
+  the wiring). An unconnected pot input floats; use `ww vol` then.
+- RFID: MFRC522 on VSPI (SCK 18, MISO 19, MOSI 23, CS 5), 4 MHz, no reset
+  pin. Polled every 250 ms; a card counts as removed after 3 polls without
+  it. UIDs are lower case hex like before (`a1b2c3d4`, 7 and 10 byte UIDs too).
+  `ww tag place <uid>` posts tag events directly, without a card.
+- WiFi: if no tag is on the box 3 s after power-on, it opens the hotspot
+  `music.Box` (like the Arduino version) and the web interface is at
+  http://192.168.4.1 (DHCP for the phone/laptop). With a tag on the box at
+  power-on there is no hotspot. Once open it stays until the next restart.
+  The hotspot is **open** by default, like before: anyone nearby can use the
+  web interface. Set `CONFIG_WW_WIFI_AP_PSK` (8..63 characters) for WPA2.
+  Name, address and the waiting time: `CONFIG_WW_WIFI_AP_SSID`, `_IP`, `_DELAY_MS`.
+- Memory: the WiFi driver keeps its heap in the 8 MB PSRAM of the A1S module
+  (`CONFIG_ESP_SPIRAM`), internal RAM is too small for audio + WiFi + web.
 
 ## REST API
 
@@ -99,8 +154,6 @@ curl -X POST -d '{"uuid":"0a1b2c3d","add":"/Music/Bibi"}' localhost:8080/api/pla
 
 ## Next steps
 
-- Hardware (ESP32-A1S audio kit): board overlay with SDMMC disk `SD`,
-  gpio-keys (one button), analog-axis on an ADC pin for the pot, I2S audio sink + AC101 codec over I2C, PA enable on GPIO21,
-  MFRC522 driver on SPI posting `WW_EV_TAG_*`
-- WiFi (station + access point "music.Box" like before) and its settings page
+- Headphone detect (GPIO39) to switch the speaker amplifier off
+- Joining a home WiFi (station mode, like the saved networks before)
 - Firmware update via MCUboot

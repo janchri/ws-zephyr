@@ -31,7 +31,13 @@
 #include <zephyr/net/http/server.h>
 #include <zephyr/net/http/service.h>
 
-#include "wirbelwind.h"
+#include "controller.h"
+#include "events.h"
+#include "http.h"
+#include "player.h"
+#include "playlist.h"
+#include "resume.h"
+#include "storage.h"
 
 LOG_MODULE_DECLARE(ww, CONFIG_WW_LOG_LEVEL);
 

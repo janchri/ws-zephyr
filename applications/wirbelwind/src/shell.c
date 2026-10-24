@@ -3,24 +3,23 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * "ww" shell commands: playback control and playlist management, plus the
- * simulated tag reader, button and volume pot used on native_sim.
+ * "ww" shell commands: playback control, playlist management and simulated
+ * tags. On native_sim native/sim.c adds the simulated controls (ww button,
+ * ww pot).
  */
 
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/shell/shell.h>
 
-#ifdef CONFIG_WW_KEYS_SIM
-#include <zephyr/drivers/adc/adc_emul.h>
-#include <zephyr/drivers/gpio/gpio_emul.h>
-#endif
-
-#include "wirbelwind.h"
+#include "controller.h"
+#include "events.h"
+#include "player.h"
+#include "playlist.h"
+#include "storage.h"
 
 /* Playback */
 
@@ -210,9 +209,10 @@ static int cmd_ls(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-/* Simulated RFID reader; on hardware the MFRC522 driver posts the same events */
+/* Simulated tags: the RFID reader posts the same events */
 
-#ifdef CONFIG_WW_TAG_READER_SIM
+#ifdef CONFIG_WW_TAG_SHELL
+
 static int cmd_tag_place(const struct shell *sh, size_t argc, char **argv)
 {
 	struct ww_event ev = {.type = WW_EV_TAG_PLACED};
@@ -245,53 +245,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_tag,
 	SHELL_CMD_ARG(place, NULL, "Place a tag: place <uid-hex>", cmd_tag_place, 2, 0),
 	SHELL_CMD_ARG(remove, NULL, "Remove the tag", cmd_tag_remove, 1, 0),
 	SHELL_SUBCMD_SET_END);
-#endif
 
-/*
- * Simulated button and volume pot: driven through the GPIO and ADC emulators,
- * so the gpio-keys / analog-axis -> input -> controller paths are exercised.
- */
-
-#ifdef CONFIG_WW_KEYS_SIM
-static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(DT_NODELABEL(button), gpios);
-
-#define POT_AXIS DT_CHILD(DT_NODELABEL(volume_pot), axis)
-#define POT_ADC  DEVICE_DT_GET(DT_IO_CHANNELS_CTLR(POT_AXIS))
-#define POT_CHAN DT_IO_CHANNELS_INPUT(POT_AXIS)
-#define POT_MV   DT_PROP(DT_IO_CHANNELS_CTLR(POT_AXIS), ref_internal_mv)
-
-static bool button_held;
-
-static void release_button(struct k_work *work)
-{
-	gpio_emul_input_set(button.port, button.pin, 0);
-	button_held = false;
-}
-
-static K_WORK_DELAYABLE_DEFINE(release_work, release_button);
-
-static int cmd_button(const struct shell *sh, size_t argc, char **argv)
-{
-	uint32_t hold_ms = argc > 1 ? strtoul(argv[1], NULL, 0) : 100;
-
-	if (button_held) {
-		shell_error(sh, "The button is still held");
-		return -EBUSY;
-	}
-
-	button_held = true;
-	gpio_emul_input_set(button.port, button.pin, 1);
-	k_work_schedule(&release_work, K_MSEC(hold_ms));
-
-	return 0;
-}
-
-static int cmd_pot(const struct shell *sh, size_t argc, char **argv)
-{
-	int percent = CLAMP(strtol(argv[1], NULL, 0), 0, 100);
-
-	return adc_emul_const_value_set(POT_ADC, POT_CHAN, POT_MV * percent / 100);
-}
+SHELL_SUBCMD_ADD((ww), tag, &sub_tag, "Simulated RFID reader", NULL, 1, 0);
 #endif
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_pl,
@@ -305,28 +260,18 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_pl,
 	SHELL_CMD_ARG(del, NULL, "Delete playlist: del <uuid>", cmd_pl_del, 2, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_ww,
-	SHELL_CMD_ARG(status, NULL, "Show the box state", cmd_status, 1, 0),
-	SHELL_CMD_ARG(next, NULL, "Next track", cmd_next, 1, 0),
-	SHELL_CMD_ARG(reset, NULL, "Restart the playlist from the first track", cmd_reset, 1, 0),
-	SHELL_CMD_ARG(reset-all, NULL, "Forget the positions of all playlists", cmd_reset_all, 1,
-		      0),
-	SHELL_CMD_ARG(vol, NULL, "Get/set volume: vol [0..max] (the pot overrides it)", cmd_vol,
-		      1, 1),
-	SHELL_CMD_ARG(seek, NULL, "Seek in the track: seek <seconds>", cmd_seek, 2, 0),
-	SHELL_CMD_ARG(track, NULL, "Jump to track: track <nr>", cmd_track, 2, 0),
-	SHELL_CMD(pl, &sub_pl, "Playlists", NULL),
-	SHELL_CMD_ARG(ls, NULL, "List SD card: ls [/path]", cmd_ls, 1, 1),
-#ifdef CONFIG_WW_TAG_READER_SIM
-	SHELL_CMD(tag, &sub_tag, "Simulated RFID reader", NULL),
-#endif
-#ifdef CONFIG_WW_KEYS_SIM
-	SHELL_CMD_ARG(button, NULL,
-		      "Press the button: button [hold ms, default 100]; "
-		      "<1 s next track, >=1 s restart playlist, >=10 s reset all",
-		      cmd_button, 1, 1),
-	SHELL_CMD_ARG(pot, NULL, "Turn the volume pot: pot <0..100>", cmd_pot, 2, 0),
-#endif
-	SHELL_SUBCMD_SET_END);
+SHELL_SUBCMD_SET_CREATE(sub_ww, (ww));
+
+SHELL_SUBCMD_ADD((ww), status, NULL, "Show the box state", cmd_status, 1, 0);
+SHELL_SUBCMD_ADD((ww), next, NULL, "Next track", cmd_next, 1, 0);
+SHELL_SUBCMD_ADD((ww), reset, NULL, "Restart the playlist from the first track", cmd_reset, 1, 0);
+SHELL_SUBCMD_ADD((ww), reset_all, NULL, "Forget the positions of all playlists", cmd_reset_all,
+		 1, 0);
+SHELL_SUBCMD_ADD((ww), vol, NULL, "Get/set volume: vol [0..max] (the pot overrides it)", cmd_vol,
+		 1, 1);
+SHELL_SUBCMD_ADD((ww), seek, NULL, "Seek in the track: seek <seconds>", cmd_seek, 2, 0);
+SHELL_SUBCMD_ADD((ww), track, NULL, "Jump to track: track <nr>", cmd_track, 2, 0);
+SHELL_SUBCMD_ADD((ww), pl, &sub_pl, "Playlists", NULL, 1, 0);
+SHELL_SUBCMD_ADD((ww), ls, NULL, "List SD card: ls [/path]", cmd_ls, 1, 1);
 
 SHELL_CMD_REGISTER(ww, &sub_ww, "WirbelWind music box", NULL);

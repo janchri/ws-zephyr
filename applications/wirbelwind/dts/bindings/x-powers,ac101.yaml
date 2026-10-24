@@ -1,0 +1,21 @@
+# Copyright (c) 2025 Christoph Jans <jans.christoph@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  X-Powers AC101 audio codec (ESP32-A1S module), controlled over I2C.
+  Audio data comes over I2S with the codec as slave; its PLL runs from the
+  I2S master clock (256 x 44.1 kHz).
+
+compatible: "x-powers,ac101"
+
+include: i2c-device.yaml
+
+properties:
+  pa-gpios:
+    type: phandle-array
+    description: Enable of the speaker amplifier
+
+  i2s:
+    type: phandle
+    required: true
+    description: I2S controller the codec is connected to

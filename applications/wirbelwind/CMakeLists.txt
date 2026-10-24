@@ -7,19 +7,39 @@ target_include_directories(app PRIVATE src lib/minimp3)
 
 target_sources(app PRIVATE
     src/main.c
-    src/controller.c
+    src/events.c
+    src/storage.c
     src/playlist.c
+    src/resume.c
     src/player.c
+    src/controller.c
+    src/inputs.c
     src/shell.c)
 
 # minimp3 mixes float and double constants
 set_source_files_properties(src/player.c PROPERTIES COMPILE_OPTIONS -Wno-double-promotion)
 
+# native_sim: simulated hardware and host audio output
+target_sources_ifdef(CONFIG_WW_SIM app PRIVATE src/native/sim.c)
 if(CONFIG_WW_AUDIO_NATIVE)
-  target_sources(app PRIVATE src/audio_native.c)
-  # Runs on the host side of native_sim (host libc), see native_simulator docs
-  target_sources(native_simulator INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src/audio_native_bottom.c)
+  target_sources(app PRIVATE src/native/audio.c)
+  # Runs on the Linux side of native_sim (host libc), see native_simulator docs
+  target_sources(native_simulator INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src/native/audio_bottom.c)
 endif()
+
+# RFID reader
+target_sources_ifdef(CONFIG_WW_RFID app PRIVATE
+    src/rfid/mfrc522.c
+    src/rfid/reader.c)
+target_sources_ifdef(CONFIG_WW_RFID_EMUL app PRIVATE src/native/mfrc522_emul.c)
+
+# ESP32-A1S: I2S + AC101 codec
+target_sources_ifdef(CONFIG_WW_AUDIO_AC101 app PRIVATE
+    src/resample.c
+    src/esp32a1s/ac101.c
+    src/esp32a1s/audio.c)
+
+target_sources_ifdef(CONFIG_WW_WIFI_AP app PRIVATE src/wifi.c)
 
 if(CONFIG_WW_HTTP)
   target_sources(app PRIVATE src/http.c)

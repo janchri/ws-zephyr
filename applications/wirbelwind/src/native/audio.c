@@ -14,11 +14,11 @@
 #include <cmdline.h>
 #include <posix_native_task.h>
 
-#include "wirbelwind.h"
+#include "audio.h"
 
 LOG_MODULE_DECLARE(ww, CONFIG_WW_LOG_LEVEL);
 
-/* Host side, see audio_native_bottom.c */
+/* Linux side, see audio_bottom.c */
 int ww_audio_host_open(const char *cmd, const char *file, unsigned int rate, unsigned int ch);
 int ww_audio_host_write(const void *buf, unsigned int len);
 void ww_audio_host_close(void);
