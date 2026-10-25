@@ -6,7 +6,7 @@
 
 /**
  * @file
- * @brief Messages between equal MCUs on a multi-master I2C bus.
+ * @brief Multi-master I2C link: one request/response transfer each.
  */
 
 #ifndef DRIVERS_I2C_I2C_MM_H_

@@ -1,6 +1,6 @@
 # twixt system
 
-Twixt samples together, as a product would have them: three boards (a, b, c) and a console gateway (gw). Each board has
+The twixt samples together, as a product would have them: three boards (a, b, c) and a console gateway (gw). Each board has
 
 - its shell on a UART over the bus to the gateway (as in `samples/twixt/uart`),
 - the setting `mcu/name`, and `twixt get` / `set` in the shell,

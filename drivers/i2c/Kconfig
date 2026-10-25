@@ -11,7 +11,7 @@ config I2C_MM_NATIVE
 	  with other processes. See dts/bindings/i2c/twixt,native-i2c-mm.yaml.
 
 menuconfig I2C_MM
-	bool "Messages between equal MCUs on a multi-master I2C bus"
+	bool "Multi-master I2C link: one request/response transfer each"
 	select I2C_TARGET
 	help
 	  Requests and responses between equal MCUs, one I2C transfer each.
@@ -43,6 +43,6 @@ source "subsys/logging/Kconfig.template.log_config"
 
 endif # I2C_MM
 
-# A byte on the emulated bus is 90 us; a coarser tick would round it up
+# A byte on the native_sim bus is 90 us; a coarser tick would round it up
 configdefault SYS_CLOCK_TICKS_PER_SEC
 	default 100000 if I2C_MM_NATIVE

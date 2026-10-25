@@ -19,4 +19,4 @@ properties:
   peer:
     type: phandle
     required: true
-    description: twixt,node at the other end
+    description: twixt,mcu at the other end

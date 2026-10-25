@@ -4,7 +4,7 @@
 DT_CHOSEN_TWIXT_SELF := twixt,self
 
 menuconfig TWIXT
-	bool "Requests between equal MCUs on a multi-master I2C bus"
+	bool "twixt: services between equal MCUs on a multi-master I2C bus"
 	default y if $(dt_chosen_enabled,$(DT_CHOSEN_TWIXT_SELF))
 	depends on I2C
 	select I2C_MM

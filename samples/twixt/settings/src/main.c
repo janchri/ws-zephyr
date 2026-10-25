@@ -37,8 +37,8 @@ static int mcu_get(const char *key, char *val, int val_len_max)
 	int len = -ENOENT;
 
 	if (settings_name_steq(key, "name", NULL)) {
-		len = strlen(twixt_name());
-		memcpy(val, twixt_name(), MIN(len, val_len_max));
+		len = strlen(twixt_self_name());
+		memcpy(val, twixt_self_name(), MIN(len, val_len_max));
 	} else if (settings_name_steq(key, "greeting", NULL)) {
 		K_SPINLOCK(&lock) {
 			len = greeting_len;
@@ -88,11 +88,11 @@ static int mcu_export(int (*export_func)(const char *name, const void *val, size
 SETTINGS_STATIC_HANDLER_DEFINE(mcu, "mcu", mcu_get, mcu_set, NULL, mcu_export);
 
 #define ADDR(node) DT_REG_ADDR(node),
-static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(twixt_node, ADDR)};
+static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(twixt_mcu, ADDR)};
 
 static uint8_t other_mcu(void)
 {
-	return mcus[0] != twixt_addr() ? mcus[0] : mcus[1];
+	return mcus[0] != twixt_self_addr() ? mcus[0] : mcus[1];
 }
 
 int main(void)
@@ -114,10 +114,10 @@ int main(void)
 		LOG_ERR("cannot load the settings: %d", ret);
 		return 0;
 	}
-	LOG_INF("%s at 0x%02x, greeting from flash: \"%.*s\"", twixt_name(), twixt_addr(),
+	LOG_INF("%s at 0x%02x, greeting from flash: \"%.*s\"", twixt_self_name(), twixt_self_addr(),
 		(int)greeting_len, greeting);
 
-	ret = twixt_ping_wait(peer, &info, K_SECONDS(5)); /* it may still be booting */
+	ret = twixt_ping_wait(peer, &info, K_SECONDS(5));
 	if (ret) {
 		LOG_ERR("no answer from 0x%02x: %d", peer, ret);
 		return 0;
@@ -130,7 +130,7 @@ int main(void)
 	}
 	LOG_INF("0x%02x is %.*s", peer, MIN(len, (int)sizeof(val)), val);
 
-	len = snprintf(hi, sizeof(hi), "hi from %s", twixt_name());
+	len = snprintf(hi, sizeof(hi), "hi from %s", twixt_self_name());
 	ret = twixt_settings_set(peer, "mcu/greeting", hi, MIN(len, (int)sizeof(hi) - 1));
 	if (ret) {
 		LOG_ERR("set mcu/greeting of 0x%02x: %d", peer, ret);

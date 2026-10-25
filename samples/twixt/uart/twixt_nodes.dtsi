@@ -10,21 +10,21 @@
  */
 
 mcu_a: mcu-a@10 {
-	compatible = "twixt,node";
+	compatible = "twixt,mcu";
 	reg = <0x10>;
 };
 
 mcu_b: mcu-b@11 {
-	compatible = "twixt,node";
+	compatible = "twixt,mcu";
 	reg = <0x11>;
 };
 
 mcu_c: mcu-c@12 {
-	compatible = "twixt,node";
+	compatible = "twixt,mcu";
 	reg = <0x12>;
 };
 
 mcu_gw: gw@70 {
-	compatible = "twixt,node";
+	compatible = "twixt,mcu";
 	reg = <0x70>;
 };

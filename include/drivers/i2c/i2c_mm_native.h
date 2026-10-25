@@ -46,15 +46,15 @@ struct i2c_mm_native_stats {
 void i2c_mm_native_get_stats(const struct device *dev, struct i2c_mm_native_stats *stats);
 
 /**
- * @brief Wait until MCUs are on the bus.
+ * @brief Wait until targets are on the bus.
  *
  * @param dev Port.
- * @param count MCUs with a target address, this one included.
+ * @param count Targets, this one included.
  *
  * @retval 0 They are.
  * @retval -ETIMEDOUT Not within 10 s.
  */
-int i2c_mm_native_wait_nodes(const struct device *dev, int count);
+int i2c_mm_native_wait_targets(const struct device *dev, int count);
 
 /**
  * @brief Mark this MCU done, and wait until MCUs are.

@@ -42,7 +42,6 @@ static int usb_init(void)
 	if (err) {
 		return err;
 	}
-	/* All CDC-ACM ports of the devicetree */
 	err = usbd_register_all_classes(&gw_usbd, USBD_SPEED_FS, 1, NULL);
 	if (err) {
 		return err;
@@ -68,6 +67,6 @@ int main(void)
 		LOG_ERR("USB: %d", err);
 	}
 #endif
-	LOG_INF("%s at 0x%02x: console gateway", twixt_name(), twixt_addr());
+	LOG_INF("%s at 0x%02x: console gateway", twixt_self_name(), twixt_self_addr());
 	return 0;
 }

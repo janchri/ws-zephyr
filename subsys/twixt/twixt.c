@@ -19,12 +19,12 @@ BUILD_ASSERT(DT_NODE_EXISTS(TWIXT_SELF), "twixt needs /chosen twixt,self");
 
 static struct i2c_mm link;
 
-const char *twixt_name(void)
+const char *twixt_self_name(void)
 {
 	return DT_NODE_FULL_NAME(TWIXT_SELF);
 }
 
-uint8_t twixt_addr(void)
+uint8_t twixt_self_addr(void)
 {
 	return DT_REG_ADDR(TWIXT_SELF);
 }
@@ -49,6 +49,10 @@ static size_t serve(const uint8_t *req, size_t len, uint8_t *rsp)
 		STRUCT_SECTION_FOREACH(twixt_service, s) {
 			if (s->id == req[0]) {
 				ret = s->handler(&r, &rsp[1]);
+				if (ret == -EIO || ret == -EAGAIN || ret == -EBUSY) {
+					LOG_ERR("service 0x%02x: %d is for the bus", s->id, ret);
+					ret = -EFAULT;
+				}
 				break;
 			}
 		}
@@ -69,7 +73,7 @@ int twixt_request(uint8_t addr, uint8_t service, const void *data, size_t len, v
 		return -EINVAL;
 	}
 	req[0] = service;
-	req[1] = twixt_addr();
+	req[1] = twixt_self_addr();
 	req[2] = 0;
 	if (len > 0) {
 		memcpy(&req[TWIXT_REQ_HDR_LEN], data, len);
@@ -108,7 +112,7 @@ static int twixt_init(void)
 	if (!ids_unique()) {
 		return -EEXIST;
 	}
-	return i2c_mm_init(&link, DEVICE_DT_GET(DT_BUS(TWIXT_SELF)), twixt_addr(), serve);
+	return i2c_mm_init(&link, DEVICE_DT_GET(DT_BUS(TWIXT_SELF)), twixt_self_addr(), serve);
 }
 
 SYS_INIT(twixt_init, POST_KERNEL, CONFIG_TWIXT_INIT_PRIORITY);
@@ -133,8 +137,8 @@ static int cmd_stats(const struct shell *sh, size_t argc, char **argv)
 	struct i2c_mm_stats s;
 
 	i2c_mm_get_stats(&link, &s);
-	shell_print(sh, "%s at 0x%02x: sent %u, served %u, retries %u", twixt_name(), twixt_addr(),
-		    s.sent, s.served, s.retries);
+	shell_print(sh, "%s at 0x%02x: sent %u, served %u, retries %u", twixt_self_name(),
+		    twixt_self_addr(), s.sent, s.served, s.retries);
 	return 0;
 }
 

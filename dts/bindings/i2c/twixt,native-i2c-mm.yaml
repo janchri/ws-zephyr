@@ -4,15 +4,15 @@
 description: |
   Multi-master I2C port for native_sim: the I2C block of one MCU, controller
   and target. Every native_sim process is one MCU; processes with the same
-  bus-id share one bus, in /dev/shm/zephyr_i2c_mm_<bus-id>.
+  bus-id share one bus, in /dev/shm/twixt_i2c_mm_<bus-id>.
 
   - A controller that finds the bus busy waits for its STOP.
   - Controllers that START within start-window-us arbitrate on address byte
     and data; the lower wins, the others get -EAGAIN.
   - Target events raise irq-line, so the target callbacks run in an ISR; the
     controller waits for it, like SCL stretching.
-  - A byte takes 9 bit times: use CONFIG_SYS_CLOCK_TICKS_PER_SEC=100000 and
-    run in real time.
+  - A byte takes 9 bit times, so CONFIG_SYS_CLOCK_TICKS_PER_SEC defaults to
+    100000; run in real time.
   - A stuck bus (i2c_mm_native_stick_bus()) is recovered before the next START.
 
   Test bench helpers: <drivers/i2c/i2c_mm_native.h>.

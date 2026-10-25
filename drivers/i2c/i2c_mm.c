@@ -23,7 +23,6 @@ static uint8_t next_rsp_byte(struct i2c_mm *mm)
 	return mm->rsp_pos < mm->rsp_len ? mm->rsp[mm->rsp_pos++] : 0xff;
 }
 
-/* A request whose read never came is not run, then or later */
 static int forget_request(struct i2c_target_config *cfg)
 {
 	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, target);
@@ -49,7 +48,7 @@ static int read_requested(struct i2c_target_config *cfg, uint8_t *val)
 
 	mm->rsp_len = mm->serve(mm->req, mm->req_len, mm->rsp);
 	mm->rsp_pos = 0;
-	mm->req_len = 0; /* a read alone must not run it again */
+	mm->req_len = 0;
 	mm->stats.served++;
 	*val = next_rsp_byte(mm);
 	return 0;

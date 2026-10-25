@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Twixt under faults, and its ping service. The emulated port can address
+ * Twixt under faults, and its ping service. The native_sim port can address
  * its own target (`loopback`), so these tests send raw transfers to this MCU's target, over
  * the bus and through its interrupt: what a broken or foreign controller could
  * send, and what a controller that lost its place leaves behind. A test service
@@ -22,12 +22,13 @@
 #define ADDR          DT_REG_ADDR(TWIXT_SELF)
 #define I2C_DEV       DEVICE_DT_GET(DT_BUS(TWIXT_SELF))
 #define EMPTY_ADDR    0x55
-#define SERVICE_COUNT 0x7e /* the test service */
-#define SERVICE_NONE  0x7d /* no service */
-#define SERVICE_ECHO  0x7c /* src, data */
-#define SERVICE_FAIL  0x7b /* answers -BIG_ERRNO */
-#define SRC           0x42 /* any sender */
-#define BIG_ERRNO     200  /* past 127, as ENOTSUP (134) with picolibc */
+#define SERVICE_COUNT (TWIXT_SERVICE_APP + 0x7e)
+#define SERVICE_NONE  (TWIXT_SERVICE_APP + 0x7d)
+#define SERVICE_ECHO  (TWIXT_SERVICE_APP + 0x7c)
+#define SERVICE_FAIL  (TWIXT_SERVICE_APP + 0x7b)
+#define SERVICE_EIO   (TWIXT_SERVICE_APP + 0x7a)
+#define SRC           0x42
+#define BIG_ERRNO     200 /* past 127, as ENOTSUP (134) with picolibc */
 
 static atomic_t runs;
 
@@ -56,6 +57,13 @@ static int fail(const struct twixt_req *req, uint8_t *rsp_data)
 }
 
 TWIXT_SERVICE_DEFINE(test_fail_service, SERVICE_FAIL, fail);
+
+static int eio(const struct twixt_req *req, uint8_t *rsp_data)
+{
+	return -EIO;
+}
+
+TWIXT_SERVICE_DEFINE(test_eio_service, SERVICE_EIO, eio);
 
 /* Raw transfers to this MCU's own target, over the bus: the request is service, src, flags,
  * data; the response is status, data
@@ -156,6 +164,14 @@ ZTEST(twixt_faults, test_big_errno)
 	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
 	zassert_equal(rsp[0], BIG_ERRNO);
 	zassert_equal(twixt_request(ADDR, SERVICE_FAIL, NULL, 0, rsp, sizeof(rsp)), -BIG_ERRNO);
+}
+
+/* A service's -EIO must not look like "nobody answers" */
+ZTEST(twixt_faults, test_bus_errno)
+{
+	uint8_t rsp[1];
+
+	zassert_equal(twixt_request(ADDR, SERVICE_EIO, NULL, 0, rsp, sizeof(rsp)), -EFAULT);
 }
 
 /* A request without its whole header (service, src, flags) is no request */

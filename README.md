@@ -99,7 +99,7 @@ This guide provides step-by-step instructions to initialize and configure a Zeph
 
 ## What is in the module
 
-- **twixt**: equal MCUs on one multi-master I2C bus, with settings and a UART (shell, console) between them, and an emulated bus for native_sim. See [doc/twixt.md](doc/twixt.md); samples in `samples/twixt/` (`hello`, `settings`, `uart`, `smp`), tests in `tests/subsys/twixt/` (`api`, `stress`), and all of it together in `applications/twixt-system/`. `scripts/twixt_run.sh` runs the MCUs of one of them on native_sim.
+- **twixt**: equal MCUs on one multi-master I2C bus, with settings and a UART (shell, console) between them, and a shared-memory bus for native_sim. See [doc/twixt.md](doc/twixt.md); samples in `samples/twixt/` (`hello`, `settings`, `uart`, `smp`), tests in `tests/subsys/twixt/` (`api`, `stress`), and all of it together in `applications/twixt-system/`. `scripts/twixt_run.sh` runs the MCUs of one of them on native_sim.
 
    ```bash
    west twister -p native_sim -T ws-zephyr/samples -T ws-zephyr/tests -T ws-zephyr/applications/twixt-system

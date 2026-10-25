@@ -379,11 +379,11 @@ void i2c_mm_native_get_stats(const struct device *dev, struct i2c_mm_native_stat
 	*stats = d->stats;
 }
 
-int i2c_mm_native_wait_nodes(const struct device *dev, int count)
+int i2c_mm_native_wait_targets(const struct device *dev, int count)
 {
 	ARG_UNUSED(dev);
 
-	return WAIT_FOR(i2c_mm_native_bottom_nodes() >= count, 10 * USEC_PER_SEC, k_msleep(1))
+	return WAIT_FOR(i2c_mm_native_bottom_targets() >= count, 10 * USEC_PER_SEC, k_msleep(1))
 		       ? 0
 		       : -ETIMEDOUT;
 }

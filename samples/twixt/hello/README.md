@@ -3,7 +3,7 @@
 Two MCUs, a (0x10) and b (0x11). Each serves an echo service of its own and calls the other's: all it takes to add a service.
 
 ```c
-#define ECHO_SERVICE 0x80 /* applications use 0x80 and up */
+#define ECHO_SERVICE TWIXT_SERVICE_APP
 
 static int echo(const struct twixt_req *req, uint8_t *rsp_data)
 {

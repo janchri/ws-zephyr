@@ -25,7 +25,7 @@ TIMEOUT_S = 10
 
 def bus_users(bus_id: int) -> list[int]:
     """PIDs of the processes that have the bus `bus_id` mapped"""
-    shm = f'/dev/shm/zephyr_i2c_mm_{bus_id}'
+    shm = f'/dev/shm/twixt_i2c_mm_{bus_id}'
     if not Path(shm).exists():
         return []  # the last process to leave removes it
     pids = []

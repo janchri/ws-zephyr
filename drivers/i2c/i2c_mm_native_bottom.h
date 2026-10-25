@@ -29,7 +29,7 @@
 int i2c_mm_native_bottom_attach(int bus_id);
 
 /* Number of live processes that have a target address on the bus */
-int i2c_mm_native_bottom_nodes(void);
+int i2c_mm_native_bottom_targets(void);
 
 /* Test bench barrier: mark this process done; count the live ones that are */
 void i2c_mm_native_bottom_set_done(void);

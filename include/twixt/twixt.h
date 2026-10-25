@@ -6,7 +6,7 @@
 
 /**
  * @file
- * @brief Requests between equal MCUs on a multi-master I2C bus.
+ * @brief twixt: services between equal MCUs on a multi-master I2C bus.
  */
 
 #ifndef TWIXT_TWIXT_H_
@@ -23,21 +23,33 @@
  * @defgroup twixt twixt
  * @{
  *
- * This MCU is /chosen twixt,self, a "twixt,node" on its I2C bus.
+ * This MCU is /chosen twixt,self, a "twixt,mcu" on its I2C bus.
  * It serves requests at its address from boot on and sends requests to the
  * others, one link transfer each (@ref i2c_mm):
  *
  *     request:   service, src, flags, data
  *     response:  status, data
  *
- * @c service is the id of the service, @c src is the sender's address, @c flags
- * is reserved: written as 0, ignored on receipt. @c status is 0 or an errno
+ * @c service picks the service (see the service ids), @c src is the sender's
+ * address, @c flags is reserved: written as 0, ignored on receipt. @c status is 0 or an errno
  * without its sign; an error has no data.
  *
  * The lowest frame wins arbitration, so a lower service id has the higher
- * priority. Allocated ids: 0x00 ping, 0x01 settings, 0x10 UART; 0x80..0xff are
- * for applications.
+ * priority.
  */
+
+/**
+ * @name Service ids
+ *
+ * The same on every MCU of the bus. Ids below TWIXT_SERVICE_APP belong to
+ * twixt; applications use TWIXT_SERVICE_APP and up.
+ * @{
+ */
+#define TWIXT_SERVICE_PING     0x00 /**< <twixt/ping.h> */
+#define TWIXT_SERVICE_SETTINGS 0x01 /**< <twixt/settings.h> */
+#define TWIXT_SERVICE_UART     0x10 /**< twixt,uart */
+#define TWIXT_SERVICE_APP      0x80 /**< First id for applications */
+/** @} */
 
 /** Protocol version; every MCU on a bus needs the same */
 #define TWIXT_PROTOCOL_VERSION 1
@@ -74,8 +86,8 @@ struct twixt_service {
 	/**
 	 * @brief Answer a request.
 	 *
-	 * Runs as i2c_mm_serve_cb does. Must not return -EIO, -EAGAIN or -EBUSY,
-	 * which mean "bus" to the caller.
+	 * Runs as i2c_mm_serve_cb does. -EIO, -EAGAIN and -EBUSY mean "bus" to the
+	 * caller, so twixt sends them as -EFAULT.
 	 *
 	 * @param req Request.
 	 * @param rsp_data Response data to write, room for TWIXT_RSP_DATA_MAX bytes.
@@ -99,10 +111,10 @@ struct twixt_service {
 	}
 
 /** @brief Name of this MCU. @return Its devicetree node name. */
-const char *twixt_name(void);
+const char *twixt_self_name(void);
 
 /** @brief I2C address of this MCU. @return Address. */
-uint8_t twixt_addr(void);
+uint8_t twixt_self_addr(void);
 
 /** @brief Copy the statistics of this MCU's link. @param stats Copy. */
 void twixt_get_stats(struct i2c_mm_stats *stats);

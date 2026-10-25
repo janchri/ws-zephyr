@@ -15,6 +15,8 @@
 #include <stdint.h>
 #include <zephyr/kernel.h>
 
+#include <twixt/twixt.h>
+
 /**
  * @defgroup twixt_ping Ping service
  * @ingroup twixt
@@ -28,9 +30,6 @@
  *
  * Shell: <tt>twixt ping \<addr\></tt>
  */
-
-/** Service id */
-#define TWIXT_SERVICE_PING 0x00
 
 /** @brief What an MCU answers */
 struct twixt_ping_info {

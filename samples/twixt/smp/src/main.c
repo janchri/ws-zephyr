@@ -16,7 +16,7 @@ LOG_MODULE_REGISTER(smp_sample, LOG_LEVEL_INF);
 
 int main(void)
 {
-	LOG_INF("%s at 0x%02x: %s", twixt_name(), twixt_addr(),
+	LOG_INF("%s at 0x%02x: %s", twixt_self_name(), twixt_self_addr(),
 		IS_ENABLED(CONFIG_MCUMGR) ? "MCUmgr on the shell" : "gateway");
 	return 0;
 }

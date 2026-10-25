@@ -6,7 +6,7 @@
  * Linux side of the native_sim multi-master I2C bus: the shared wires.
  * See i2c_mm_native_bottom.h. Runs in the native_simulator runner (host libc).
  *
- * The state lives in POSIX shared memory (/dev/shm/zephyr_i2c_mm_<bus-id>),
+ * The state lives in POSIX shared memory (/dev/shm/twixt_i2c_mm_<bus-id>),
  * guarded by a process-shared robust mutex. Slots of processes that died are
  * reclaimed, so a crashed run does not block the next one.
  */
@@ -185,7 +185,7 @@ int i2c_mm_native_bottom_attach(int bus_id)
 	if (wire) {
 		return -EBUSY; /* one port per process */
 	}
-	snprintf(shm_name, sizeof(shm_name), "/zephyr_i2c_mm_%d", bus_id);
+	snprintf(shm_name, sizeof(shm_name), "/twixt_i2c_mm_%d", bus_id);
 
 	wire = map_wire(&created);
 	if (!wire) {
@@ -242,7 +242,7 @@ int i2c_mm_native_bottom_attach(int bus_id)
 	return 0;
 }
 
-int i2c_mm_native_bottom_nodes(void)
+int i2c_mm_native_bottom_targets(void)
 {
 	int n = 0;
 

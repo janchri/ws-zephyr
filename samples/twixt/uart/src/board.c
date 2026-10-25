@@ -20,9 +20,9 @@ int main(void)
 {
 	static char prompt[32];
 
-	snprintf(prompt, sizeof(prompt), "%s:~$ ", twixt_name());
+	snprintf(prompt, sizeof(prompt), "%s:~$ ", twixt_self_name());
 	shell_prompt_change(shell_backend_uart_get_ptr(), prompt);
 
-	LOG_INF("%s at 0x%02x, shell on the bus", twixt_name(), twixt_addr());
+	LOG_INF("%s at 0x%02x, shell on the bus", twixt_self_name(), twixt_self_addr());
 	return 0;
 }

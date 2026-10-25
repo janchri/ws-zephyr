@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 #
-# Builds the MCUs of an twixt sample for native_sim (west build -DNODE=<node>),
+# Builds the MCUs of a twixt sample for native_sim (west build -DNODE=<node>),
 # runs each as its own process on the sample's virtual I2C bus, and prints their
 # logs as they come, every line after the name of its MCU. Ctrl-C stops them.
 #

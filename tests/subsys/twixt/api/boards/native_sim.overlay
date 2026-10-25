@@ -5,7 +5,7 @@
  */
 
 /* One MCU alone on the bus: requests to itself, raw transfers to its own target
- * (the emulated port can address it), and NACKs from an empty address. A bus-id
+ * (the native_sim port can address it), and NACKs from an empty address. A bus-id
  * of its own, so that the samples (bus 0 and 1) do not get in the way.
  */
 
@@ -21,7 +21,7 @@
 	loopback;
 
 	mcu_self: mcu@20 {
-		compatible = "twixt,node";
+		compatible = "twixt,mcu";
 		reg = <0x20>;
 	};
 };

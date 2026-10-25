@@ -25,7 +25,7 @@
  *  - a setting that does not exist is not there.
  *
  * The MCUs on the bus and their I2C addresses are devicetree
- * (boards/native_sim.overlay, compatible "twixt,node"); the one this
+ * (boards/native_sim.overlay, compatible "twixt,mcu"); the one this
  * image runs on is /chosen twixt,self, picked by -DNODE=<a|b|c>.
  */
 
@@ -54,12 +54,11 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 #define PERIOD_MS   100
 #define PROBE_ADDR  0x55 /* nobody there */
 
-/* All MCUs on the bus */
 #define MCU(node)  DT_REG_ADDR(node),
 #define NAME(node) DT_NODE_FULL_NAME(node),
 
-static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(twixt_node, MCU)};
-static const char *const names[] = {DT_FOREACH_STATUS_OKAY(twixt_node, NAME)};
+static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(twixt_mcu, MCU)};
+static const char *const names[] = {DT_FOREACH_STATUS_OKAY(twixt_mcu, NAME)};
 
 #define NUM_MCUS ARRAY_SIZE(mcus)
 
@@ -96,8 +95,8 @@ static int mcu_get(const char *key, char *val, int val_len_max)
 	int len = -ENOENT;
 
 	if (settings_name_steq(key, "name", NULL)) {
-		src = twixt_name();
-		len = strlen(twixt_name());
+		src = twixt_self_name();
+		len = strlen(twixt_self_name());
 	} else if (settings_name_steq(key, "version", NULL)) {
 		src = APP_VERSION;
 		len = strlen(APP_VERSION);
@@ -109,7 +108,7 @@ static int mcu_get(const char *key, char *val, int val_len_max)
 	K_SPINLOCK(&lock) {
 		if (i >= 0) {
 			src = dumps[i].data;
-			len = dumps[i].len > 0 ? dumps[i].len : -ENOENT; /* 0: not set */
+			len = dumps[i].len > 0 ? dumps[i].len : -ENOENT;
 		}
 		if (len > val_len_max) {
 			len = -ENOMEM;
@@ -263,20 +262,19 @@ int main(void)
 		ret = settings_load();
 	}
 	if (ret) {
-		LOG_ERR("%s: cannot load the settings: %d", twixt_name(), ret);
+		LOG_ERR("%s: cannot load the settings: %d", twixt_self_name(), ret);
 		return ret;
 	}
-	LOG_INF("%s at 0x%02x, version %s; dumps from flash: %u, %u, %u bytes", twixt_name(),
-		twixt_addr(), APP_VERSION, dumps[0].len, dumps[1].len, dumps[2].len);
+	LOG_INF("%s at 0x%02x, version %s; dumps from flash: %u, %u, %u bytes", twixt_self_name(),
+		twixt_self_addr(), APP_VERSION, dumps[0].len, dumps[1].len, dumps[2].len);
 
 	/* Test bench: the other MCUs are processes that start at their own pace */
-	ret = i2c_mm_native_wait_nodes(I2C_DEV, NUM_MCUS);
+	ret = i2c_mm_native_wait_targets(I2C_DEV, NUM_MCUS);
 	if (ret) {
-		LOG_ERR("%s: the other MCUs did not show up", twixt_name());
+		LOG_ERR("%s: the other MCUs did not show up", twixt_self_name());
 		return ret;
 	}
 
-	/* Every MCU speaks our protocol, with our limits */
 	for (int i = 0; i < NUM_MCUS; i++) {
 		struct twixt_ping_info info;
 
@@ -284,7 +282,6 @@ int main(void)
 		check(0, mcus[i], "ping", ret == 0, ret);
 	}
 
-	/* The bus must NACK an address nobody has */
 	ret = twixt_settings_get(PROBE_ADDR, "mcu/name", &byte, 1);
 	check(0, PROBE_ADDR, "get mcu/name (nobody there)", ret == -EIO, ret);
 
@@ -301,7 +298,7 @@ int main(void)
 	/* After that nobody sends any more: the counts are final */
 	ret = i2c_mm_native_wait_done(I2C_DEV, NUM_MCUS);
 	if (ret) {
-		LOG_ERR("%s: the other MCUs did not finish", twixt_name());
+		LOG_ERR("%s: the other MCUs did not finish", twixt_self_name());
 		return ret;
 	}
 

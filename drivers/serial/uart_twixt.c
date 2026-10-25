@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * UART over twixt (dts/bindings/twixt/twixt,uart.yaml).
+ * UART over twixt (dts/bindings/serial/twixt,uart.yaml).
  *
  *     request:  TWIXT_SERVICE_UART, chunk of up to CONFIG_UART_TWIXT_CHUNK bytes
  *     response: how many bytes the peer took
@@ -28,8 +28,6 @@
 #include <twixt/twixt.h>
 
 LOG_MODULE_REGISTER(uart_twixt, CONFIG_UART_LOG_LEVEL);
-
-#define TWIXT_SERVICE_UART 0x10
 
 #define CHUNK CONFIG_UART_TWIXT_CHUNK
 

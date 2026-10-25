@@ -14,6 +14,8 @@
 
 #include <stdint.h>
 
+#include <twixt/twixt.h>
+
 /**
  * @defgroup twixt_settings Settings service
  * @ingroup twixt
@@ -33,9 +35,6 @@
  * Shell: <tt>twixt get \<addr\> \<key\></tt>,
  * <tt>twixt set \<addr\> \<key\> \<text\></tt>
  */
-
-/** Service id */
-#define TWIXT_SERVICE_SETTINGS 0x01
 
 /** Op: get a setting */
 #define TWIXT_SETTINGS_OP_GET 0

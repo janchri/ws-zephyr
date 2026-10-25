@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(board, LOG_LEVEL_INF);
 /* Runs in the I2C target interrupt too: a constant needs no lock */
 static int mcu_get(const char *key, char *val, int val_len_max)
 {
-	int len = strlen(twixt_name());
+	int len = strlen(twixt_self_name());
 
 	if (!settings_name_steq(key, "name", NULL)) {
 		return -ENOENT;
@@ -31,7 +31,7 @@ static int mcu_get(const char *key, char *val, int val_len_max)
 	if (len > val_len_max) {
 		return -ENOMEM;
 	}
-	memcpy(val, twixt_name(), len);
+	memcpy(val, twixt_self_name(), len);
 	return len;
 }
 
@@ -52,9 +52,9 @@ int main(void)
 		LOG_ERR("settings: %d", ret);
 	}
 
-	snprintf(prompt, sizeof(prompt), "%s:~$ ", twixt_name());
+	snprintf(prompt, sizeof(prompt), "%s:~$ ", twixt_self_name());
 	shell_prompt_change(shell_backend_uart_get_ptr(), prompt);
 
-	LOG_INF("%s at 0x%02x, shell on the bus", twixt_name(), twixt_addr());
+	LOG_INF("%s at 0x%02x, shell on the bus", twixt_self_name(), twixt_self_addr());
 	return 0;
 }
