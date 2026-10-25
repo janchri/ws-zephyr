@@ -6,8 +6,10 @@
 # boards, opens the PTY the gateway has for each, and runs shell commands there.
 # A command that gets a setting of another board goes over the bus once more;
 # the fs commands work on the board's littlefs. Every board runs in its build
-# folder, so its flash is the flash.bin there.
+# folder, so its flash is the flash.bin there. MCUmgr (SMP) on the same PTY
+# moves a file to and from /lfs, and an image into slot 1.
 
+import asyncio
 import os
 import re
 import select
@@ -17,6 +19,10 @@ import tty
 from pathlib import Path
 
 import pytest
+from smpclient import SMPClient
+from smpclient.mcuboot import IMAGE_TLV, ImageInfo
+from smpclient.requests.image_management import ImageStatesRead
+from smpclient.transport.serial import SMPSerialTransport
 from twister_harness import DeviceAdapter
 
 BUS_SHM = '/dev/shm/zephyr_i2c_mm_1'  # bus-id 1, boards/native_sim.overlay
@@ -100,13 +106,18 @@ def boards(required_build_dirs: list[str]):
 
 
 @pytest.fixture
-def shells(boards, unlaunched_dut: DeviceAdapter):
+def ptys(boards, unlaunched_dut: DeviceAdapter) -> dict[str, str]:
+    """The gateway's PTY of every board"""
     dut = unlaunched_dut
     dut.launch()
     lines = dut.readlines_until(regex=r'pty-c connected', timeout=TIMEOUT_S)
     ptys = dict(m.groups() for m in map(PTY.search, lines) if m)
     assert set(ptys) == set(BOARDS), f'PTYs of the gateway: {ptys}'
+    return ptys
 
+
+@pytest.fixture
+def shells(ptys: dict[str, str]):
     opened = {n: Shell(ptys[n], f'mcu-{n}@{BOARDS[n]:x}') for n in BOARDS}
     try:
         for shell in opened.values():
@@ -146,3 +157,37 @@ def test_shell(shells: dict[str, Shell]):
         # Many chunks in a row, more than the gateway's buffers
         out = shell.run('help')
         assert 'mcubus' in out and len(out) > 512, out
+
+
+async def smp_transfers(pty: str, image_path: Path):
+    client = SMPClient(SMPSerialTransport(), pty, timeout_s=TIMEOUT_S)
+    await client.connect()
+    try:
+        data = os.urandom(4096)
+        async for _ in client.upload_file(data, '/lfs/smp.bin'):
+            pass
+        assert await client.download_file('/lfs/smp.bin') == data
+
+        async for _ in client.upload(image_path.read_bytes()):
+            pass
+        states = await client.request(ImageStatesRead())
+        return {img.slot: img for img in states.images}
+    finally:
+        await client.disconnect()
+
+
+def test_smp(ptys: dict[str, str], tmp_path: Path):
+    # An MCUboot image of random bytes, as "west sign" makes it of a build
+    payload, image_path = tmp_path / 'payload.bin', tmp_path / 'image.bin'
+    payload.write_bytes(os.urandom(8192))
+    subprocess.run(
+        ['imgtool', 'create', '--version', '1.2.3', '--header-size', '0x200', '--pad-header',
+         '--align', '4', '--slot-size', '0x69000', payload, image_path],
+        check=True,
+    )  # fmt: skip
+
+    slots = asyncio.run(smp_transfers(ptys['a'], image_path))
+    assert 1 in slots, slots
+    image = ImageInfo.load_file(str(image_path))
+    assert slots[1].version == '1.2.3', slots[1]
+    assert slots[1].hash == image.get_tlv(IMAGE_TLV.SHA256).value, slots[1]

@@ -22,6 +22,10 @@ mcu-a@10:~$ mcubus stats
 mcu-a@10 at 0x10: sent 21, served 6, retries 0
 ```
 
+The counts include the shell itself: every chunk of output that a board sends to the gateway is a request, and so is every chunk of typing it receives.
+
+That goes over the bus twice: the command line and its output between the laptop and a, and the request between a and b.
+
 Each board's flash has the partitions of the product: `settings` (32 KiB, NVS, the backend of the settings) and `storage` (256 KiB, littlefs, mounted at `/lfs`). The `fs` shell commands work on it:
 
 ```
@@ -36,9 +40,20 @@ bsize 16, frsize 4096, blocks 64, bfree 62
 
 The first boot formats the storage partition. littlefs is the west project `littlefs`, in the `name-allowlist` of `ws-zephyr/west.yml`.
 
-The counts include the shell itself: every chunk of output that a board sends to the gateway is a request, and so is every chunk of typing it receives.
+### Files and firmware from the laptop: MCUmgr
 
-That goes over the bus twice: the command line and its output between the laptop and a, and the request between a and b.
+The boards speak MCUmgr's SMP protocol on the same PTY as their shell (`CONFIG_MCUMGR_TRANSPORT_SHELL`): the shell passes SMP frames on to MCUmgr, and the gateway carries them like any other byte. Two groups: **fs** (upload and download files on `/lfs`) and **img** (upload a firmware image into slot 1). Any SMP client on the laptop works; `smpmgr` is the command line tool on top of `smpclient`, which the twister test uses (`uv tool install smpmgr==0.19.1`, or `pip install smpmgr==0.19.1`). With the PTY of board a that `scripts/run.sh` prints:
+
+```
+smpmgr --port /dev/pts/7 file upload notes.txt /lfs/notes.txt
+smpmgr --port /dev/pts/7 file download /lfs/notes.txt back.txt
+smpmgr --port /dev/pts/7 image upload zephyr.signed.bin
+smpmgr --port /dev/pts/7 image state-read
+```
+
+Close `tio` on that PTY first: the shell and SMP share it. Every command logs a warning that reading the MCUmgr parameters failed: that request belongs to the os group, which the boards leave out; the client goes on with its defaults.
+
+An image must be in MCUboot's format (`west sign`, or `imgtool create`). On native_sim there is no MCUboot: the image lands in slot 1 and `image state-read` shows it, but nothing boots it; on hardware, MCUboot swaps it in at the next reset. SMP frames carry a CRC16 of their own, and MCUboot checks the image's hash, so a frame that the bus garbles is rejected, not written. On native_sim a transfer runs at about 1.5 KB/s. The image group needs the west projects `mcuboot` (its bootutil library) and `zcbor`.
 
 ## Build and run
 
@@ -62,7 +77,7 @@ Open one with `tio`, `picocom` or `screen`, and press Enter for a prompt (a boar
 west twister -p native_sim -T ws-zephyr/samples/mcubus/shell
 ```
 
-Twister builds the four MCUs and starts the gateway; `pytest/test_shell.py` starts the boards (`required_applications`), opens the PTY of each, and runs in its shell: `mcubus ping` and `mcubus get` of the next board, `mcubus set` of a read-only setting (-13, `-EACCES`), a file written, listed and read back on `/lfs`, and `help`, whose output is many chunks in a row. Every board runs in its build folder, so its flash is the `flash.bin` there.
+Twister builds the four MCUs and starts the gateway; `pytest/test_shell.py` starts the boards (`required_applications`), opens the PTY of each, and runs in its shell: `mcubus ping` and `mcubus get` of the next board, `mcubus set` of a read-only setting (-13, `-EACCES`), a file written, listed and read back on `/lfs`, and `help`, whose output is many chunks in a row. `test_smp` then uses MCUmgr on board a's PTY (`smpclient`): a file uploaded to `/lfs` and downloaded again, and an image (`imgtool create`) uploaded and found in slot 1 with its version and hash. Every board runs in its build folder, so its flash is the `flash.bin` there. The Python packages are in `ws-zephyr/requirements.txt`.
 
 ## The gateway on a Raspberry Pi Pico
 
@@ -84,11 +99,11 @@ Zephyr's driver for the Pico's I2C block (`i2c_dw`) does not switch back to targ
 
 | File                          | What                                                     |
 |-------------------------------|----------------------------------------------------------|
-| `boards/native_sim.overlay`   | `&i2c0` as the multi-master port (bus 1) with the MCUs on it, `zephyr,mcubus-self = &MCUBUS_SELF_LABEL`; the gateway's PTYs; a board's partitions |
-| `boards/native_sim.conf`      | Real time, and a tick fine enough for the emulated bus   |
+| `boards/native_sim.overlay`   | `&i2c0` as the multi-master port (bus 1) with the MCUs on it, `zephyr,mcubus-self = &MCUBUS_SELF_LABEL`; the gateway's PTYs; a board's partitions, the image slots as mapped partitions |
+| `boards/native_sim.conf`      | Real time, a tick fine enough for the emulated bus; the image runs from slot 0 |
 | `boards/rpi_pico.overlay`, `.conf` | The gateway on a Pico: the bus on I2C0, a USB CDC-ACM port per board |
 | `mcubus_nodes.dtsi`           | The MCUs on the bus, included by every board's overlay   |
-| `board.overlay`, `board.conf` | A board: shell on a `zephyr,mcubus-uart` to the gateway; NVS on the settings partition, littlefs on the storage partition at `/lfs` |
+| `board.overlay`, `board.conf` | A board: shell on a `zephyr,mcubus-uart` to the gateway; NVS on the settings partition, littlefs on the storage partition at `/lfs`; MCUmgr (fs, img) on the shell |
 | `gateway.overlay`             | The gateway: per board a `zephyr,mcubus-uart`, bridged to a host port (`host_a`..`host_c`, from the board's overlay) |
 | `src/board.c`                 | A board: its setting `mcu/name`, its prompt              |
 | `src/gateway.c`               | The gateway: the USB device, if it has CDC-ACM ports     |

@@ -36,5 +36,7 @@ manifest:
         - hal_rpi_pico
         - littlefs
         - mbedtls
+        - mcuboot
         - segger
         - tf-psa-crypto
+        - zcbor

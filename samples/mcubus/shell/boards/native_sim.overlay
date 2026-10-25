@@ -45,6 +45,17 @@
 #include "../mcubus_nodes.dtsi"
 };
 
+/* The image slots of the stock partitions, as mapped partitions: the img group
+ * of MCUmgr finds the running image (slot 0) by the chosen code partition
+ */
+&slot0_partition {
+	compatible = "zephyr,mapped-partition";
+};
+
+&slot1_partition {
+	compatible = "zephyr,mapped-partition";
+};
+
 /* A board's partitions, after the stock ones, which end at 1 MiB; the stock
  * storage_partition goes, so that there is one storage
  */

@@ -88,7 +88,7 @@ mcubus set <addr> <key> <text>
 - **Its controller may not learn that it ran.** If the read of the response fails, the controller gets an error, and the request may have run or not. A settings SET can be sent again; UART bytes sent again arrive twice.
 - **A request that does not fit** `MCUBUS_MSG_MAX` is NACKed: `-EIO`.
 - **A stuck bus is the I2C driver's to recover.** A target that was reset in the middle of a read can hold SDA low. Only the driver can tell that from another master's transfer (SDA low, but no START on the bus), so it clocks the bus free (nine clocks, a STOP) before its own START. mcubus does not guess it from an error code: recovering while another master owns the bus would break that master's transfer.
-- **No checksum.** An ACK only says that a byte arrived. A request with a bit error is run as it arrived.
+- **No checksum.** An ACK only says that a byte arrived. A request with a bit error is run as it arrived. Protocols on top can bring their own: MCUmgr's SMP frames over the UART carry a CRC16.
 
 ### Settings
 
@@ -98,7 +98,7 @@ mcubus set <addr> <key> <text>
 
 `zephyr,mcubus-uart` is a UART device (interrupt-driven API) whose other end is the MCU `peer`. Sending is pushing: a thread sends what was written in requests of up to `CONFIG_UART_MCUBUS_CHUNK` (32) bytes; the peer answers how many it took, and the rest is sent again, so a full receive buffer holds the sender back. If nobody answers at `peer`, the bytes are dropped, as on a UART without a cable. Received bytes go, in the interrupt, to the UART whose `peer` is the source address.
 
-The stock shell (`zephyr,shell-uart`), console and `zephyr,uart-bridge` use it as they are. A board points its shell at a UART to the gateway; the gateway has one UART per board, each bridged to a serial port of its own (PTY on native_sim, USB CDC-ACM on hardware).
+The stock shell (`zephyr,shell-uart`), console and `zephyr,uart-bridge` use it as they are. A board points its shell at a UART to the gateway; the gateway has one UART per board, each bridged to a serial port of its own (PTY on native_sim, USB CDC-ACM on hardware). MCUmgr's shell transport uses the same line for SMP: files and firmware images from the laptop (`samples/mcubus/shell`).
 
 ## The bus on native_sim
 
