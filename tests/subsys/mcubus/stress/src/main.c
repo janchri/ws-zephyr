@@ -46,12 +46,13 @@
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
-#define APP_VERSION   "1.0.0"
-#define DUMPS         3
-#define ROUNDS        20
-#define PERIOD_MS     100
-#define SETTLE_ROUNDS 20   /* 2 s for the last requests of a late MCU */
-#define PROBE_ADDR    0x55 /* nobody there */
+#define I2C_DEV DEVICE_DT_GET(DT_BUS(MCUBUS_SELF))
+
+#define APP_VERSION "1.0.0"
+#define DUMPS       3
+#define ROUNDS      20
+#define PERIOD_MS   100
+#define PROBE_ADDR  0x55 /* nobody there */
 
 /* All MCUs on the bus */
 #define MCU(node)  DT_REG_ADDR(node),
@@ -126,9 +127,12 @@ static int mcu_set(const char *key, size_t len, settings_read_cb read_cb, void *
 	int i = dump_index(key);
 	ssize_t ret;
 
+	if (settings_name_steq(key, "name", NULL) || settings_name_steq(key, "version", NULL) ||
+	    settings_name_steq(key, "counter", NULL)) {
+		return -EACCES;
+	}
 	if (i < 0) {
-		/* no room: -ENOMEM for a setting there is, -ENOENT for one there is not */
-		return mcu_get(key, NULL, 0) == -ENOENT ? -ENOENT : -EACCES;
+		return -ENOENT;
 	}
 	if (len == 0 || len > sizeof(dumps[i].data)) {
 		return -EINVAL;
@@ -266,7 +270,7 @@ int main(void)
 		mcubus_addr(), APP_VERSION, dumps[0].len, dumps[1].len, dumps[2].len);
 
 	/* Test bench: the other MCUs are processes that start at their own pace */
-	ret = i2c_mm_emul_wait_nodes(mcubus_link()->i2c, NUM_MCUS);
+	ret = i2c_mm_emul_wait_nodes(I2C_DEV, NUM_MCUS);
 	if (ret) {
 		LOG_ERR("%s: the other MCUs did not show up", mcubus_name());
 		return ret;
@@ -285,7 +289,7 @@ int main(void)
 	check(0, PROBE_ADDR, "get mcu/name (nobody there)", ret == -EIO, ret);
 
 	for (uint8_t round = 0; round < ROUNDS; round++) {
-		i2c_mm_emul_wait_round(mcubus_link()->i2c, round, PERIOD_MS);
+		i2c_mm_emul_wait_round(I2C_DEV, round, PERIOD_MS);
 		K_SPINLOCK(&lock) {
 			counter++;
 		}
@@ -294,14 +298,15 @@ int main(void)
 		random_request(round);
 	}
 
-	/*
-	 * The others finish their last round together with us, unless the host is
-	 * busy and one of them runs late: wait until they are done
-	 */
-	i2c_mm_emul_wait_round(mcubus_link()->i2c, ROUNDS + SETTLE_ROUNDS, PERIOD_MS);
+	/* After that nobody sends any more: the counts are final */
+	ret = i2c_mm_emul_wait_done(I2C_DEV, NUM_MCUS);
+	if (ret) {
+		LOG_ERR("%s: the other MCUs did not finish", mcubus_name());
+		return ret;
+	}
 
-	i2c_mm_emul_get_stats(mcubus_link()->i2c, &s);
-	i2c_mm_get_stats(mcubus_link(), &bus);
+	i2c_mm_emul_get_stats(I2C_DEV, &s);
+	mcubus_get_stats(&bus);
 	LOG_INF("sent %u requests, served %u requests; %u bad; %u retries; lost arbitration %u, "
 		"bus timeouts %u, nacks %u, irqs %u",
 		bus.sent, bus.served, bad, bus.retries, s.arb_lost, s.bus_timeouts, s.nacks,

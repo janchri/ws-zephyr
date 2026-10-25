@@ -14,7 +14,7 @@ from smpclient.transport.serial import SMPSerialTransport
 from twister_harness import DeviceAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'scripts' / 'pylib'))
-from mcubus_bench import TIMEOUT_S, ptys, start_nodes  # noqa: E402
+from mcubus_bench import TIMEOUT_S, gateway_ptys  # noqa: E402
 
 BUS_ID = 3  # boards/native_sim.overlay
 
@@ -28,8 +28,5 @@ async def smp(pty: str):
 
 
 def test_smp(required_build_dirs: list[str], unlaunched_dut: DeviceAdapter):
-    with start_nodes(required_build_dirs, BUS_ID) as (board,):
-        unlaunched_dut.launch()
-        lines = unlaunched_dut.readlines_until(regex=r'pty-a connected', timeout=TIMEOUT_S)
-        board.wait_for(r'MCUmgr on the shell')
-        asyncio.run(smp(ptys(lines)['a']))
+    with gateway_ptys(unlaunched_dut, required_build_dirs, BUS_ID, ['a']) as paths:
+        asyncio.run(smp(paths['a']))

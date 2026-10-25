@@ -24,8 +24,7 @@ from smpclient.transport.serial import SMPSerialTransport
 from twister_harness import DeviceAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts' / 'pylib'))
-from mcubus_bench import TIMEOUT_S, Shell, ptys  # noqa: E402
-from mcubus_bench import start_nodes as start_boards  # noqa: E402
+from mcubus_bench import TIMEOUT_S, Shell, board_shells, gateway_ptys  # noqa: E402
 
 BUS_ID = 5  # boards/native_sim.overlay
 BOARDS = {'a': 0x10, 'b': 0x11, 'c': 0x12}
@@ -33,23 +32,14 @@ BOARDS = {'a': 0x10, 'b': 0x11, 'c': 0x12}
 
 @pytest.fixture
 def ptys_of_boards(required_build_dirs: list[str], unlaunched_dut: DeviceAdapter):
-    """The gateway's PTY of every board, with the boards running"""
-    with start_boards(required_build_dirs, BUS_ID):
-        unlaunched_dut.launch()
-        lines = unlaunched_dut.readlines_until(regex=r'pty-c connected', timeout=TIMEOUT_S)
-        paths = ptys(lines)
-        assert set(paths) == set(BOARDS), f'PTYs of the gateway: {paths}'
+    with gateway_ptys(unlaunched_dut, required_build_dirs, BUS_ID, list(BOARDS)) as paths:
         yield paths
 
 
 @pytest.fixture
 def shells(ptys_of_boards: dict[str, str]):
-    opened = {n: Shell(ptys_of_boards[n], f'mcu-{n}@{BOARDS[n]:x}:~$ ') for n in BOARDS}
-    try:
+    with board_shells(ptys_of_boards, BOARDS) as opened:
         yield opened
-    finally:
-        for shell in opened.values():
-            shell.close()
 
 
 def test_shell(shells: dict[str, Shell]):

@@ -387,6 +387,16 @@ int i2c_mm_emul_wait_nodes(const struct device *dev, int count)
 										      : -ETIMEDOUT;
 }
 
+int i2c_mm_emul_wait_done(const struct device *dev, int count)
+{
+	ARG_UNUSED(dev);
+
+	i2c_mm_host_set_done();
+	return WAIT_FOR(i2c_mm_host_done_count() >= count, 10 * USEC_PER_SEC, k_msleep(1))
+		       ? 0
+		       : -ETIMEDOUT;
+}
+
 void i2c_mm_emul_wait_round(const struct device *dev, uint32_t round, uint32_t period_ms)
 {
 	int64_t due_us = i2c_mm_host_epoch_us() + 1000000LL + round * period_ms * 1000LL;

@@ -95,25 +95,10 @@ static uint8_t other_mcu(void)
 	return mcus[0] != mcubus_addr() ? mcus[0] : mcus[1];
 }
 
-/* The other MCU may still be booting: ping it until it answers */
-static int wait_for(uint8_t addr)
-{
-	struct mcubus_info info;
-	int ret;
-
-	for (int i = 0; i < 50; i++) {
-		ret = mcubus_ping(addr, &info);
-		if (ret != -EIO) {
-			break;
-		}
-		k_msleep(100);
-	}
-	return ret;
-}
-
 int main(void)
 {
 	uint8_t peer = other_mcu();
+	struct mcubus_info info;
 	char val[MCUBUS_SETTINGS_VALUE_MAX];
 	char hi[MCUBUS_SETTINGS_VALUE_MAX];
 	int len;
@@ -132,7 +117,7 @@ int main(void)
 	LOG_INF("%s at 0x%02x, greeting from flash: \"%.*s\"", mcubus_name(), mcubus_addr(),
 		(int)greeting_len, greeting);
 
-	ret = wait_for(peer);
+	ret = mcubus_ping_wait(peer, &info, K_SECONDS(5)); /* it may still be booting */
 	if (ret) {
 		LOG_ERR("no answer from 0x%02x: %d", peer, ret);
 		return 0;

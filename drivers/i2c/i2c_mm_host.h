@@ -30,6 +30,10 @@ int i2c_mm_host_attach(int bus_id);
 /* Number of live processes that have a target address on the bus */
 int i2c_mm_host_nodes(void);
 
+/* Test bench barrier: mark this process done; count the live ones that are */
+void i2c_mm_host_set_done(void);
+int i2c_mm_host_done_count(void);
+
 /* Target address of this process, -1 for none. 0 or a negative errno. */
 int i2c_mm_host_set_target(int addr);
 

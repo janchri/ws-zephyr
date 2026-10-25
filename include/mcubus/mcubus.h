@@ -74,10 +74,8 @@ struct mcubus_service {
 	/**
 	 * @brief Answer a request.
 	 *
-	 * Runs in the I2C target interrupt, or in the sending thread for a request
-	 * of this MCU to itself, possibly both at once: keep it short, and shared
-	 * state under a spinlock. Must not return -EIO, -EAGAIN or -EBUSY, which
-	 * mean "bus" to the caller.
+	 * Runs as i2c_mm_request_cb does. Must not return -EIO, -EAGAIN or -EBUSY,
+	 * which mean "bus" to the caller.
 	 *
 	 * @param req Request.
 	 * @param rsp Payload to write, room for MCUBUS_PAYLOAD_MAX bytes.
@@ -106,15 +104,14 @@ const char *mcubus_name(void);
 /** @brief I2C address of this MCU. @return Address. */
 uint8_t mcubus_addr(void);
 
-/** @brief Link of this MCU to the bus. @return Link. */
-const struct i2c_mm *mcubus_link(void);
+/** @brief Copy the statistics of this MCU's link. @param stats Copy. */
+void mcubus_get_stats(struct i2c_mm_stats *stats);
 
 /**
  * @brief Send a request and read the payload of the response.
  *
- * Payload bytes the service did not write read as 0xff. A request to this MCU
- * runs the service directly. A request runs at most once, but if reading the
- * response fails, it may or may not have run.
+ * Transfers as i2c_mm_transfer() does; payload the service did not write reads
+ * as 0xff.
  *
  * @param addr MCU to send to, may be this one.
  * @param cmd Service.

@@ -24,6 +24,7 @@
 #include <mcubus/settings.h>
 
 #define ADDR       DT_REG_ADDR(MCUBUS_SELF)
+#define I2C_DEV    DEVICE_DT_GET(DT_BUS(MCUBUS_SELF))
 #define EMPTY_ADDR 0x55
 
 static const uint8_t ro[4] = {0xde, 0xad, 0xbe, 0xef};
@@ -180,11 +181,11 @@ ZTEST(mcubus_settings, test_nobody_there)
 	struct i2c_mm_stats bus;
 	uint8_t val[MCUBUS_SETTINGS_VALUE_MAX];
 
-	i2c_mm_emul_get_stats(mcubus_link()->i2c, &before);
+	i2c_mm_emul_get_stats(I2C_DEV, &before);
 	zassert_equal(mcubus_settings_get(EMPTY_ADDR, "t/ro", val, sizeof(val)), -EIO);
-	i2c_mm_emul_get_stats(mcubus_link()->i2c, &after);
+	i2c_mm_emul_get_stats(I2C_DEV, &after);
 	zassert_equal(after.nacks, before.nacks + 1);
-	i2c_mm_get_stats(mcubus_link(), &bus);
+	mcubus_get_stats(&bus);
 	zassert_equal(bus.sent, 0);
 }
 

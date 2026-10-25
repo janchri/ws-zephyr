@@ -57,6 +57,19 @@ void i2c_mm_emul_get_stats(const struct device *dev, struct i2c_mm_emul_stats *s
 int i2c_mm_emul_wait_nodes(const struct device *dev, int count);
 
 /**
+ * @brief Mark this MCU done, and wait until MCUs are.
+ *
+ * A barrier: once it returns, @p count MCUs, this one included, have called it.
+ *
+ * @param dev Port.
+ * @param count MCUs to wait for.
+ *
+ * @retval 0 They are done.
+ * @retval -ETIMEDOUT Not within 10 s.
+ */
+int i2c_mm_emul_wait_done(const struct device *dev, int count);
+
+/**
  * @brief Wait for the start of a round, the same moment on every MCU.
  *
  * Round 0 starts 1 s after the first MCU joined the bus, every later one

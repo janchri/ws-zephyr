@@ -97,6 +97,30 @@ def ptys(lines: list[str]) -> dict[str, str]:
     return dict(m.groups() for m in map(PTY.search, lines) if m)
 
 
+@contextmanager
+def gateway_ptys(
+    dut, build_dirs: list[str], bus_id: int, boards: list[str]
+) -> Iterator[dict[str, str]]:
+    """Start the boards, launch the gateway (the DUT), and yield its PTY of every board"""
+    with start_nodes(build_dirs, bus_id):
+        dut.launch()
+        lines = dut.readlines_until(regex=rf'pty-{boards[-1]} connected', timeout=TIMEOUT_S)
+        paths = ptys(lines)
+        assert set(paths) == set(boards), f'PTYs of the gateway: {paths}'
+        yield paths
+
+
+@contextmanager
+def board_shells(paths: dict[str, str], boards: dict[str, int]) -> Iterator[dict[str, 'Shell']]:
+    """The shell of every board, its prompt being its node name: mcu-a@10:~$"""
+    opened = {n: Shell(paths[n], f'mcu-{n}@{addr:x}:~$ ') for n, addr in boards.items()}
+    try:
+        yield opened
+    finally:
+        for shell in opened.values():
+            shell.close()
+
+
 class Shell:
     """The shell of a board, on the gateway's PTY for it"""
 

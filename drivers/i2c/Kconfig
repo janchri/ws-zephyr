@@ -42,3 +42,7 @@ module-str = i2c_mm
 source "subsys/logging/Kconfig.template.log_config"
 
 endif # I2C_MM
+
+# A byte on the emulated bus is 90 us; a coarser tick would round it up
+configdefault SYS_CLOCK_TICKS_PER_SEC
+	default 100000 if I2C_MM_EMUL

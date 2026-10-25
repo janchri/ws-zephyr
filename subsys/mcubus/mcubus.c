@@ -29,18 +29,14 @@ uint8_t mcubus_addr(void)
 	return DT_REG_ADDR(MCUBUS_SELF);
 }
 
-const struct i2c_mm *mcubus_link(void)
+void mcubus_get_stats(struct i2c_mm_stats *stats)
 {
-	return &link;
+	i2c_mm_get_stats(&link, stats);
 }
 
-static size_t dispatch(struct i2c_mm *mm, const uint8_t *req, size_t len, uint8_t *rsp,
-		       size_t rsp_max)
+static size_t dispatch(const uint8_t *req, size_t len, uint8_t *rsp)
 {
 	int ret = -EINVAL;
-
-	ARG_UNUSED(mm);
-	__ASSERT_NO_MSG(rsp_max == MCUBUS_MSG_MAX);
 
 	if (len >= MCUBUS_HDR_LEN) {
 		const struct mcubus_req r = {

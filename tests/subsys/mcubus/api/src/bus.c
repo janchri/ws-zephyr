@@ -20,6 +20,7 @@
 #include <mcubus/ping.h>
 
 #define ADDR       DT_REG_ADDR(MCUBUS_SELF)
+#define I2C_DEV    DEVICE_DT_GET(DT_BUS(MCUBUS_SELF))
 #define EMPTY_ADDR 0x55
 #define CMD_COUNT  0x7e /* the test service */
 #define CMD_NONE   0x7d /* no service */
@@ -61,7 +62,7 @@ MCUBUS_SERVICE_DEFINE(test_fail_service, CMD_FAIL, fail);
  */
 static int request(const uint8_t *req, size_t req_len, uint8_t *rsp, size_t rsp_len)
 {
-	return i2c_write_read(mcubus_link()->i2c, ADDR, req, req_len, rsp, rsp_len);
+	return i2c_write_read(I2C_DEV, ADDR, req, req_len, rsp, rsp_len);
 }
 
 static const uint8_t count_req[] = {CMD_COUNT, SRC, 0};
@@ -86,7 +87,7 @@ ZTEST(mcubus_faults, test_read_alone)
 	zassert_ok(request(count_req, sizeof(count_req), rsp, sizeof(rsp)));
 	before = atomic_get(&runs);
 
-	zassert_ok(i2c_read(mcubus_link()->i2c, rsp, sizeof(rsp), ADDR));
+	zassert_ok(i2c_read(I2C_DEV, rsp, sizeof(rsp), ADDR));
 	zassert_equal(rsp[0], EINVAL);
 	zassert_equal(atomic_get(&runs), before, "the last request ran again");
 }
@@ -97,8 +98,8 @@ ZTEST(mcubus_faults, test_write_alone)
 	atomic_val_t before = atomic_get(&runs);
 	uint8_t rsp[2];
 
-	zassert_ok(i2c_write(mcubus_link()->i2c, count_req, sizeof(count_req), ADDR));
-	zassert_ok(i2c_read(mcubus_link()->i2c, rsp, sizeof(rsp), ADDR));
+	zassert_ok(i2c_write(I2C_DEV, count_req, sizeof(count_req), ADDR));
+	zassert_ok(i2c_read(I2C_DEV, rsp, sizeof(rsp), ADDR));
 	zassert_equal(rsp[0], EINVAL);
 	zassert_equal(atomic_get(&runs), before);
 }
@@ -208,11 +209,11 @@ ZTEST(mcubus_faults, test_stuck_bus)
 	struct i2c_mm_emul_stats before, after;
 	struct mcubus_info info;
 
-	i2c_mm_emul_get_stats(mcubus_link()->i2c, &before);
-	i2c_mm_emul_stick_bus(mcubus_link()->i2c);
+	i2c_mm_emul_get_stats(I2C_DEV, &before);
+	i2c_mm_emul_stick_bus(I2C_DEV);
 
 	zassert_equal(mcubus_ping(EMPTY_ADDR, &info), -EIO, "not through to the NACK");
-	i2c_mm_emul_get_stats(mcubus_link()->i2c, &after);
+	i2c_mm_emul_get_stats(I2C_DEV, &after);
 	zassert_equal(after.recoveries, before.recoveries + 1);
 }
 

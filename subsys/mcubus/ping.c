@@ -35,6 +35,17 @@ int mcubus_ping(uint8_t addr, struct mcubus_info *info)
 		       : -EPROTO;
 }
 
+int mcubus_ping_wait(uint8_t addr, struct mcubus_info *info, k_timeout_t timeout)
+{
+	k_timepoint_t end = sys_timepoint_calc(timeout);
+	int ret;
+
+	while ((ret = mcubus_ping(addr, info)) == -EIO && !sys_timepoint_expired(end)) {
+		k_msleep(100);
+	}
+	return ret;
+}
+
 #ifdef CONFIG_MCUBUS_SHELL
 
 static int cmd_ping(const struct shell *sh, size_t argc, char **argv)

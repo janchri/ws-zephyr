@@ -12,7 +12,7 @@ import pytest
 from twister_harness import DeviceAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'scripts' / 'pylib'))
-from mcubus_bench import TIMEOUT_S, Shell, ptys, start_nodes  # noqa: E402
+from mcubus_bench import Shell, board_shells, gateway_ptys  # noqa: E402
 
 BUS_ID = 1  # boards/native_sim.overlay
 BOARDS = {'a': 0x10, 'b': 0x11, 'c': 0x12}
@@ -20,17 +20,11 @@ BOARDS = {'a': 0x10, 'b': 0x11, 'c': 0x12}
 
 @pytest.fixture
 def shells(required_build_dirs: list[str], unlaunched_dut: DeviceAdapter):
-    with start_nodes(required_build_dirs, BUS_ID):
-        unlaunched_dut.launch()
-        lines = unlaunched_dut.readlines_until(regex=r'pty-c connected', timeout=TIMEOUT_S)
-        paths = ptys(lines)
-        assert set(paths) == set(BOARDS), f'PTYs of the gateway: {paths}'
-        opened = {n: Shell(paths[n], f'mcu-{n}@{BOARDS[n]:x}:~$ ') for n in BOARDS}
-        try:
-            yield opened
-        finally:
-            for shell in opened.values():
-                shell.close()
+    with (
+        gateway_ptys(unlaunched_dut, required_build_dirs, BUS_ID, list(BOARDS)) as paths,
+        board_shells(paths, BOARDS) as opened,
+    ):
+        yield opened
 
 
 def test_uart(shells: dict[str, Shell]):

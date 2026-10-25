@@ -36,8 +36,6 @@
 /** Longest request and longest response, in bytes */
 #define I2C_MM_MSG_MAX CONFIG_I2C_MM_MSG_MAX
 
-struct i2c_mm;
-
 /**
  * @brief Answer a request.
  *
@@ -45,16 +43,13 @@ struct i2c_mm;
  * the MCU to itself, possibly both at once: keep it short, and shared state
  * under a spinlock.
  *
- * @param mm Link.
  * @param req Request.
  * @param req_len Length of @p req, 0 for a read without a request.
- * @param rsp Response to write.
- * @param rsp_max Room in @p rsp.
+ * @param rsp Response to write, room for I2C_MM_MSG_MAX bytes.
  *
  * @return Length of the response.
  */
-typedef size_t (*i2c_mm_request_cb)(struct i2c_mm *mm, const uint8_t *req, size_t req_len,
-				    uint8_t *rsp, size_t rsp_max);
+typedef size_t (*i2c_mm_request_cb)(const uint8_t *req, size_t req_len, uint8_t *rsp);
 
 /** @brief Link statistics */
 struct i2c_mm_stats {
@@ -120,18 +115,6 @@ int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_
  */
 int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t req_len, void *rsp,
 		    size_t rsp_len);
-
-/**
- * @brief Own target address.
- *
- * @param mm Link.
- *
- * @return Address.
- */
-static inline uint16_t i2c_mm_addr(const struct i2c_mm *mm)
-{
-	return mm->cfg.address;
-}
 
 /**
  * @brief Copy the link statistics.

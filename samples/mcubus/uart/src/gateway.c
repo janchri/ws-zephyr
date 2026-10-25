@@ -57,22 +57,17 @@ static int usb_init(void)
 	return usbd_enable(&gw_usbd);
 }
 
-#else
-
-static int usb_init(void)
-{
-	return 0;
-}
-
 #endif
 
 int main(void)
 {
+#if DT_HAS_COMPAT_STATUS_OKAY(zephyr_cdc_acm_uart)
 	int err = usb_init();
 
 	if (err) {
 		LOG_ERR("USB: %d", err);
 	}
+#endif
 	LOG_INF("%s at 0x%02x: console gateway", mcubus_name(), mcubus_addr());
 	return 0;
 }

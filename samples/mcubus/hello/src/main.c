@@ -37,28 +37,10 @@ static uint8_t other_mcu(void)
 	return mcus[0] != mcubus_addr() ? mcus[0] : mcus[1];
 }
 
-/* The other MCU may still be booting: ping it until it answers */
-static int wait_for(uint8_t addr)
-{
-	struct mcubus_info info;
-	int ret;
-
-	for (int i = 0; i < 50; i++) {
-		ret = mcubus_ping(addr, &info);
-		if (ret != -EIO) {
-			break;
-		}
-		k_msleep(100);
-	}
-	if (ret == 0) {
-		LOG_INF("0x%02x answers: protocol %u", addr, info.version);
-	}
-	return ret;
-}
-
 int main(void)
 {
 	uint8_t peer = other_mcu();
+	struct mcubus_info info;
 	char msg[32];
 	uint8_t rsp[1 + sizeof(msg)] = {0};
 	int len;
@@ -68,11 +50,12 @@ int main(void)
 
 	LOG_INF("%s at 0x%02x", mcubus_name(), mcubus_addr());
 
-	ret = wait_for(peer);
+	ret = mcubus_ping_wait(peer, &info, K_SECONDS(5)); /* it may still be booting */
 	if (ret) {
 		LOG_ERR("no answer from 0x%02x: %d", peer, ret);
 		return 0;
 	}
+	LOG_INF("0x%02x answers: protocol %u", peer, info.version);
 
 	len = snprintf(msg, sizeof(msg), "hello from %s", mcubus_name());
 	ret = mcubus_request(peer, ECHO_CMD, msg, len, rsp, 1 + len);

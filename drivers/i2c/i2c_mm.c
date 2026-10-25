@@ -47,7 +47,7 @@ static int read_requested(struct i2c_target_config *cfg, uint8_t *val)
 {
 	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
 
-	mm->tx_len = mm->cb(mm, mm->rx, mm->rx_len, mm->tx, sizeof(mm->tx));
+	mm->tx_len = mm->cb(mm->rx, mm->rx_len, mm->tx);
 	mm->tx_pos = 0;
 	mm->rx_len = 0; /* a read alone must not run it again */
 	mm->stats.served++;
@@ -95,7 +95,7 @@ static void transfer_self(struct i2c_mm *mm, const uint8_t *req, size_t req_len,
 			  size_t rsp_len)
 {
 	uint8_t out[I2C_MM_MSG_MAX];
-	size_t len = mm->cb(mm, req, req_len, out, sizeof(out));
+	size_t len = mm->cb(req, req_len, out);
 
 	memset(&out[len], 0xff, sizeof(out) - len);
 	memcpy(rsp, out, rsp_len);
@@ -104,12 +104,12 @@ static void transfer_self(struct i2c_mm *mm, const uint8_t *req, size_t req_len,
 int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t req_len, void *rsp,
 		    size_t rsp_len)
 {
-	int64_t end = k_uptime_get() + CONFIG_I2C_MM_RETRY_MS;
+	k_timepoint_t end = sys_timepoint_calc(K_MSEC(CONFIG_I2C_MM_RETRY_MS));
 
 	if (req_len > I2C_MM_MSG_MAX || rsp_len > I2C_MM_MSG_MAX) {
 		return -EINVAL;
 	}
-	if (addr == i2c_mm_addr(mm)) {
+	if (addr == mm->cfg.address) {
 		transfer_self(mm, req, req_len, rsp, rsp_len);
 		return 0;
 	}
@@ -130,10 +130,10 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 		}
 		k_mutex_unlock(&mm->lock);
 
-		if ((ret != -EAGAIN && ret != -EBUSY) || k_uptime_get() >= end) {
+		if ((ret != -EAGAIN && ret != -EBUSY) || sys_timepoint_expired(end)) {
 			return ret;
 		}
-		LOG_WRN("0x%02x: request to 0x%02x attempt %u: %s, backing off", i2c_mm_addr(mm),
+		LOG_WRN("0x%02x: request to 0x%02x attempt %u: %s, backing off", mm->cfg.address,
 			addr, i, ret == -EAGAIN ? "lost arbitration" : "bus busy");
 		/* out of the winner's START window, then wait for its STOP */
 		k_sleep(K_MSEC(2 * MIN(i, 4)));

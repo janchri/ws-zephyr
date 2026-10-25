@@ -27,7 +27,7 @@
 #include "i2c_mm_host.h"
 
 #define MAX_SLOTS  8
-#define WIRE_MAGIC 0x32634d4dU
+#define WIRE_MAGIC 0x33634d4dU
 
 struct slot {
 	pid_t pid;           /* 0: slot is free */
@@ -38,6 +38,7 @@ struct slot {
 	int32_t result;
 	uint8_t ev_byte;
 	uint8_t ans_byte;
+	uint8_t done; /* test bench: i2c_mm_host_set_done() */
 };
 
 struct wire {
@@ -249,6 +250,26 @@ int i2c_mm_host_nodes(void)
 	reap();
 	for (int i = 0; i < MAX_SLOTS; i++) {
 		n += wire->slots[i].pid != 0 && wire->slots[i].target_addr >= 0;
+	}
+	unlock();
+	return n;
+}
+
+void i2c_mm_host_set_done(void)
+{
+	lock();
+	wire->slots[my_slot].done = 1;
+	unlock();
+}
+
+int i2c_mm_host_done_count(void)
+{
+	int n = 0;
+
+	lock();
+	reap();
+	for (int i = 0; i < MAX_SLOTS; i++) {
+		n += wire->slots[i].pid != 0 && wire->slots[i].done;
 	}
 	unlock();
 	return n;

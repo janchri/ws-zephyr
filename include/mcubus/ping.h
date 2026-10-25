@@ -13,6 +13,7 @@
 #define MCUBUS_PING_H_
 
 #include <stdint.h>
+#include <zephyr/kernel.h>
 
 /**
  * @defgroup mcubus_ping Ping service
@@ -50,6 +51,18 @@ struct mcubus_info {
  * @retval -errno See mcubus_request().
  */
 int mcubus_ping(uint8_t addr, struct mcubus_info *info);
+
+/**
+ * @brief Ping an MCU until it answers, e.g. while it boots.
+ *
+ * @param addr MCU to ping.
+ * @param info What it answered.
+ * @param timeout How long to keep trying.
+ *
+ * @retval -EIO Nobody answered within @p timeout.
+ * @retval others As mcubus_ping().
+ */
+int mcubus_ping_wait(uint8_t addr, struct mcubus_info *info, k_timeout_t timeout);
 
 /** @} */
 
