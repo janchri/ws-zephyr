@@ -18,48 +18,48 @@ void i2c_mm_get_stats(const struct i2c_mm *mm, struct i2c_mm_stats *stats)
 	*stats = mm->stats;
 }
 
-static uint8_t next_byte(struct i2c_mm *mm)
+static uint8_t next_rsp_byte(struct i2c_mm *mm)
 {
-	return mm->tx_pos < mm->tx_len ? mm->tx[mm->tx_pos++] : 0xff;
+	return mm->rsp_pos < mm->rsp_len ? mm->rsp[mm->rsp_pos++] : 0xff;
 }
 
 /* A request whose read never came is not run, then or later */
 static int forget_request(struct i2c_target_config *cfg)
 {
-	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
+	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, target);
 
-	mm->rx_len = 0;
+	mm->req_len = 0;
 	return 0;
 }
 
 static int write_received(struct i2c_target_config *cfg, uint8_t val)
 {
-	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
+	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, target);
 
-	if (mm->rx_len >= sizeof(mm->rx)) {
+	if (mm->req_len >= sizeof(mm->req)) {
 		return -ENOMEM;
 	}
-	mm->rx[mm->rx_len++] = val;
+	mm->req[mm->req_len++] = val;
 	return 0;
 }
 
 static int read_requested(struct i2c_target_config *cfg, uint8_t *val)
 {
-	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
+	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, target);
 
-	mm->tx_len = mm->cb(mm->rx, mm->rx_len, mm->tx);
-	mm->tx_pos = 0;
-	mm->rx_len = 0; /* a read alone must not run it again */
+	mm->rsp_len = mm->serve(mm->req, mm->req_len, mm->rsp);
+	mm->rsp_pos = 0;
+	mm->req_len = 0; /* a read alone must not run it again */
 	mm->stats.served++;
-	*val = next_byte(mm);
+	*val = next_rsp_byte(mm);
 	return 0;
 }
 
 static int read_processed(struct i2c_target_config *cfg, uint8_t *val)
 {
-	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
+	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, target);
 
-	*val = next_byte(mm);
+	*val = next_rsp_byte(mm);
 	return 0;
 }
 
@@ -71,7 +71,7 @@ static const struct i2c_target_callbacks target_cb = {
 	.stop = forget_request,
 };
 
-int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_mm_request_cb cb)
+int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_mm_serve_cb serve)
 {
 	int ret;
 
@@ -80,11 +80,11 @@ int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_
 		return -ENODEV;
 	}
 	mm->i2c = i2c;
-	mm->cb = cb;
+	mm->serve = serve;
 	k_mutex_init(&mm->lock);
-	mm->cfg.address = addr;
-	mm->cfg.callbacks = &target_cb;
-	ret = i2c_target_register(i2c, &mm->cfg);
+	mm->target.address = addr;
+	mm->target.callbacks = &target_cb;
+	ret = i2c_target_register(i2c, &mm->target);
 	if (ret) {
 		LOG_ERR("%s: cannot serve at 0x%02x: %d", i2c->name, addr, ret);
 	}
@@ -95,7 +95,7 @@ static void transfer_self(struct i2c_mm *mm, const uint8_t *req, size_t req_len,
 			  size_t rsp_len)
 {
 	uint8_t out[I2C_MM_MSG_MAX];
-	size_t len = mm->cb(req, req_len, out);
+	size_t len = mm->serve(req, req_len, out);
 
 	memset(&out[len], 0xff, sizeof(out) - len);
 	memcpy(rsp, out, rsp_len);
@@ -109,7 +109,7 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 	if (req_len > I2C_MM_MSG_MAX || rsp_len > I2C_MM_MSG_MAX) {
 		return -EINVAL;
 	}
-	if (addr == mm->cfg.address) {
+	if (addr == mm->target.address) {
 		transfer_self(mm, req, req_len, rsp, rsp_len);
 		return 0;
 	}
@@ -121,7 +121,7 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 		k_mutex_lock(&mm->lock, K_FOREVER);
 		ret = i2c_write_read(mm->i2c, addr, req, req_len, rsp, rsp_len);
 		if (IS_ENABLED(CONFIG_I2C_MM_TARGET_REREGISTER)) {
-			(void)i2c_target_register(mm->i2c, &mm->cfg);
+			(void)i2c_target_register(mm->i2c, &mm->target);
 		}
 		if (ret == 0) {
 			mm->stats.sent++;
@@ -133,7 +133,7 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 		if ((ret != -EAGAIN && ret != -EBUSY) || sys_timepoint_expired(end)) {
 			return ret;
 		}
-		LOG_WRN("0x%02x: request to 0x%02x attempt %u: %s, backing off", mm->cfg.address,
+		LOG_WRN("0x%02x: request to 0x%02x attempt %u: %s, backing off", mm->target.address,
 			addr, i, ret == -EAGAIN ? "lost arbitration" : "bus busy");
 		/* out of the winner's START window, then wait for its STOP */
 		k_sleep(K_MSEC(2 * MIN(i, 4)));

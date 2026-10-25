@@ -9,8 +9,8 @@
  * @brief Messages between equal MCUs on a multi-master I2C bus.
  */
 
-#ifndef I2C_MM_H_
-#define I2C_MM_H_
+#ifndef DRIVERS_I2C_I2C_MM_H_
+#define DRIVERS_I2C_I2C_MM_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -49,7 +49,7 @@
  *
  * @return Length of the response.
  */
-typedef size_t (*i2c_mm_request_cb)(const uint8_t *req, size_t req_len, uint8_t *rsp);
+typedef size_t (*i2c_mm_serve_cb)(const uint8_t *req, size_t req_len, uint8_t *rsp);
 
 /** @brief Link statistics */
 struct i2c_mm_stats {
@@ -65,15 +65,15 @@ struct i2c_mm_stats {
 struct i2c_mm {
 	/** @cond INTERNAL_HIDDEN */
 	const struct device *i2c;
-	i2c_mm_request_cb cb;
+	i2c_mm_serve_cb serve;
 	struct i2c_mm_stats stats;
 	struct k_mutex lock;
-	struct i2c_target_config cfg;
-	uint8_t rx[I2C_MM_MSG_MAX];
-	uint8_t rx_len;
-	uint8_t tx[I2C_MM_MSG_MAX];
-	uint8_t tx_len;
-	uint8_t tx_pos;
+	struct i2c_target_config target;
+	uint8_t req[I2C_MM_MSG_MAX];
+	uint8_t req_len;
+	uint8_t rsp[I2C_MM_MSG_MAX];
+	uint8_t rsp_len;
+	uint8_t rsp_pos;
 	/** @endcond */
 };
 
@@ -83,13 +83,13 @@ struct i2c_mm {
  * @param mm Link.
  * @param i2c I2C bus.
  * @param addr Own target address.
- * @param cb Callback that answers the requests.
+ * @param serve Callback that answers the requests.
  *
  * @retval 0 Serving.
  * @retval -ENODEV Bus not ready.
  * @retval -errno Target registration failed.
  */
-int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_mm_request_cb cb);
+int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_mm_serve_cb serve);
 
 /**
  * @brief Send a request and read the response.
@@ -126,4 +126,4 @@ void i2c_mm_get_stats(const struct i2c_mm *mm, struct i2c_mm_stats *stats);
 
 /** @} */
 
-#endif /* I2C_MM_H_ */
+#endif /* DRIVERS_I2C_I2C_MM_H_ */

@@ -1,14 +1,14 @@
 # Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 
-config I2C_MM_EMUL
+config I2C_MM_NATIVE
 	bool "Multi-master I2C port for native_sim"
 	default y
-	depends on DT_HAS_ZEPHYR_I2C_MM_EMUL_ENABLED
+	depends on DT_HAS_TWIXT_NATIVE_I2C_MM_ENABLED
 	depends on ARCH_POSIX
 	help
 	  I2C controller and target of one native_sim process, on a bus shared
-	  with other processes. See dts/bindings/i2c/zephyr,i2c-mm-emul.yaml.
+	  with other processes. See dts/bindings/i2c/twixt,native-i2c-mm.yaml.
 
 menuconfig I2C_MM
 	bool "Messages between equal MCUs on a multi-master I2C bus"
@@ -45,4 +45,4 @@ endif # I2C_MM
 
 # A byte on the emulated bus is 90 us; a coarser tick would round it up
 configdefault SYS_CLOCK_TICKS_PER_SEC
-	default 100000 if I2C_MM_EMUL
+	default 100000 if I2C_MM_NATIVE
