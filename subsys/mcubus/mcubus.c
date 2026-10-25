@@ -34,11 +34,6 @@ const struct i2c_mm *mcubus_link(void)
 	return &link;
 }
 
-/*
- * Answer request `req` (cmd, src, data) for the others or for this MCU: the
- * status goes to rsp[0], the service's payload after it. Returns the response
- * length.
- */
 static size_t dispatch(struct i2c_mm *mm, const uint8_t *req, size_t len, uint8_t *rsp,
 		       size_t rsp_max)
 {
@@ -47,8 +42,12 @@ static size_t dispatch(struct i2c_mm *mm, const uint8_t *req, size_t len, uint8_
 	ARG_UNUSED(mm);
 	__ASSERT_NO_MSG(rsp_max == MCUBUS_MSG_MAX);
 
-	if (len >= 2) {
-		const struct mcubus_req r = {.src = req[1], .data = &req[2], .len = len - 2};
+	if (len >= MCUBUS_HDR_LEN) {
+		const struct mcubus_req r = {
+			.src = req[1],
+			.data = &req[MCUBUS_HDR_LEN],
+			.len = len - MCUBUS_HDR_LEN,
+		};
 
 		ret = -ENOTSUP;
 		STRUCT_SECTION_FOREACH(mcubus_service, s) {
@@ -58,7 +57,8 @@ static size_t dispatch(struct i2c_mm *mm, const uint8_t *req, size_t len, uint8_
 			}
 		}
 	}
-	rsp[0] = MIN(ret, 0);
+	/* errno without its sign: Zephyr's errno values go past 127 (ENOTSUP is 134) */
+	rsp[0] = ret < 0 ? MIN(-ret, UINT8_MAX) : 0;
 	return 1 + MAX(ret, 0);
 }
 
@@ -74,20 +74,24 @@ int mcubus_request(uint8_t addr, uint8_t cmd, const void *data, size_t len, void
 	}
 	req[0] = cmd;
 	req[1] = mcubus_addr();
-	memcpy(&req[2], data, len);
+	req[2] = 0;
+	if (len > 0) {
+		memcpy(&req[MCUBUS_HDR_LEN], data, len);
+	}
 
-	ret = i2c_mm_transfer(&link, addr, req, 2 + len, in, 1 + rsp_len);
+	ret = i2c_mm_transfer(&link, addr, req, MCUBUS_HDR_LEN + len, in, 1 + rsp_len);
 	if (ret) {
 		return ret;
 	}
-	if ((int8_t)in[0] < 0) {
-		return (int8_t)in[0];
+	if (in[0] != 0) {
+		return -in[0];
 	}
-	memcpy(rsp, &in[1], rsp_len);
+	if (rsp_len > 0) {
+		memcpy(rsp, &in[1], rsp_len);
+	}
 	return 0;
 }
 
-/* Two services with one cmd: only the first would ever run */
 static bool cmds_unique(void)
 {
 	bool unique = true;
@@ -113,8 +117,6 @@ static int mcubus_init(void)
 
 SYS_INIT(mcubus_init, POST_KERNEL, CONFIG_MCUBUS_INIT_PRIORITY);
 
-/* ---- shell: the "mcubus" command, the services add theirs --------------------- */
-
 #ifdef CONFIG_MCUBUS_SHELL
 
 int mcubus_shell_addr(const struct shell *sh, const char *arg, uint8_t *addr)
@@ -130,7 +132,6 @@ int mcubus_shell_addr(const struct shell *sh, const char *arg, uint8_t *addr)
 	return 0;
 }
 
-/* mcubus stats */
 static int cmd_stats(const struct shell *sh, size_t argc, char **argv)
 {
 	struct i2c_mm_stats s;

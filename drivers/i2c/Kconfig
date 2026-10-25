@@ -7,19 +7,15 @@ config I2C_MM_EMUL
 	depends on DT_HAS_ZEPHYR_I2C_MM_EMUL_ENABLED
 	depends on ARCH_POSIX
 	help
-	  I2C controller and target of one MCU on a bus that is shared by
-	  several native_sim processes (dts/bindings/i2c/zephyr,i2c-mm-emul.yaml).
-	  Include <drivers/i2c/i2c_mm_emul.h> for its statistics and the test
-	  bench helpers.
+	  I2C controller and target of one native_sim process, on a bus shared
+	  with other processes. See dts/bindings/i2c/zephyr,i2c-mm-emul.yaml.
 
 menuconfig I2C_MM
 	bool "Messages between equal MCUs on a multi-master I2C bus"
 	select I2C_TARGET
 	help
-	  This MCU serves requests at its address as an I2C target and sends
-	  requests to the others as a controller; a request and its response
-	  are one transfer. Agnostic of what the bytes mean: mcubus
-	  (CONFIG_MCUBUS) builds on it. See <drivers/i2c/i2c_mm.h>.
+	  Requests and responses between equal MCUs, one I2C transfer each.
+	  See <drivers/i2c/i2c_mm.h>.
 
 if I2C_MM
 
@@ -28,23 +24,18 @@ config I2C_MM_MSG_MAX
 	default 64
 	range 8 255
 	help
-	  In bytes. Every MCU on the bus needs the same value.
+	  In bytes. The same on every MCU of the bus.
 
 config I2C_MM_RETRY_MS
-	int "How long a request is retried after lost arbitration or a busy bus"
+	int "Retry time after lost arbitration or a busy bus, in ms"
 	default 500
-	help
-	  The lowest frame always wins the arbitration: a request with a high
-	  frame can wait behind every other transfer of a busy bus.
 
 config I2C_MM_TARGET_REREGISTER
 	bool "Register the target again after every transfer"
 	default y if DT_HAS_SNPS_DESIGNWARE_I2C_ENABLED
 	help
-	  For I2C drivers that switch the block to controller mode for a transfer
-	  and do not switch back to target mode afterwards, such as Zephyr's
-	  DesignWare driver (Raspberry Pi Pico). Until it is registered again, the
-	  MCU does not answer at its address.
+	  For drivers that leave target mode for a transfer and do not return
+	  to it, such as the DesignWare driver (Raspberry Pi Pico).
 
 module = I2C_MM
 module-str = i2c_mm

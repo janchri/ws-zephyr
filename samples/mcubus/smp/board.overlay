@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* The board: its shell, and so MCUmgr, is on a UART over the bus to the gateway */
+/* The board: shell, and so MCUmgr, on a UART to the gateway */
 
 / {
 	chosen {

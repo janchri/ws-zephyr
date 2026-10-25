@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* native_sim ships &i2c0 as a stock emulated controller; here it is the
- * multi-master port (ws-zephyr/drivers/i2c/i2c_mm_emul.c), wired to the other
- * MCUs, on bus 1.
- * Which MCU an image is comes from CMake: MCUBUS_SELF_LABEL is mcu_<NODE>.
- */
+/* The bus on native_sim (zephyr,i2c-mm-emul); MCUBUS_SELF_LABEL is mcu_<NODE> */
 
 / {
 	chosen {

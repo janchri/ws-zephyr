@@ -2,25 +2,24 @@
 # SPDX-License-Identifier: Apache-2.0
 
 menuconfig MCUBUS_SETTINGS
-	bool "Settings service: get and set the settings of the MCUs by name"
+	bool "Settings service"
 	depends on SETTINGS
 	select SETTINGS_RUNTIME
 	help
-	  Every MCU serves its own settings, and gets and sets those of the
-	  others. See <mcubus/settings.h>.
+	  See <mcubus/settings.h>.
 
 if MCUBUS_SETTINGS
 
 config MCUBUS_SETTINGS_KEY_MAX
-	int "Longest key, with the terminating NUL"
+	int "Longest key, NUL included"
 	default 24
 	range 2 128
 
 config MCUBUS_SETTINGS_VALUE_MAX
 	int "Longest value"
 	default 16
-	range 1 125
+	range 1 251
 	help
-	  A SET (cmd, src, op, key, value) must fit CONFIG_I2C_MM_MSG_MAX.
+	  Op, key and value of a set must fit MCUBUS_DATA_MAX.
 
 endif # MCUBUS_SETTINGS

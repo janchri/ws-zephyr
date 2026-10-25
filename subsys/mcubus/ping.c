@@ -9,8 +9,6 @@
 #include <mcubus/mcubus.h>
 #include <mcubus/ping.h>
 
-/* ---- the service, for the others or for this MCU ------------------------- */
-
 static int ping(const struct mcubus_req *req, uint8_t *rsp)
 {
 	ARG_UNUSED(req);
@@ -21,8 +19,6 @@ static int ping(const struct mcubus_req *req, uint8_t *rsp)
 }
 
 MCUBUS_SERVICE_DEFINE(mcubus_ping_service, MCUBUS_PING_CMD, ping);
-
-/* ---- requests -------------------------------------------------------------- */
 
 int mcubus_ping(uint8_t addr, struct mcubus_info *info)
 {
@@ -39,11 +35,8 @@ int mcubus_ping(uint8_t addr, struct mcubus_info *info)
 		       : -EPROTO;
 }
 
-/* ---- shell ------------------------------------------------------------------- */
-
 #ifdef CONFIG_MCUBUS_SHELL
 
-/* mcubus ping <addr> */
 static int cmd_ping(const struct shell *sh, size_t argc, char **argv)
 {
 	struct mcubus_info info;

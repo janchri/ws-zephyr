@@ -2,11 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 description: |
-  An MCU on the mcubus, a multi-master I2C bus of equal peers: a child of the
-  bus node, reg is its I2C address. There it serves requests of the other MCUs
-  (include/mcubus/mcubus.h).
-
-  /chosen zephyr,mcubus-self is the MCU the firmware runs on.
+  An MCU on the mcubus, at its I2C address. /chosen zephyr,mcubus-self is the
+  MCU the image runs on. See include/mcubus/mcubus.h.
 
     &i2c0 {
             mcu_a: mcu-a@10 {

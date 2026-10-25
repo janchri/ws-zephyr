@@ -66,8 +66,6 @@ BUILD_ASSERT(NUM_MCUS > 1, "no other MCU on the bus");
 
 static uint32_t bad; /* checks that failed */
 
-/* ---- my settings ------------------------------------------------------------ */
-
 /*
  * The handlers run in the I2C target interrupt for the other MCUs, and in
  * threads for this one (settings_load(), settings_save(), any local use of the
@@ -168,8 +166,6 @@ static int mcu_export(int (*export_func)(const char *name, const void *val, size
 }
 
 SETTINGS_STATIC_HANDLER_DEFINE(mcu, "mcu", mcu_get, mcu_set, NULL, mcu_export);
-
-/* ---- the requests ----------------------------------------------------------- */
 
 /*
  * Random number in 0..n-1. Not `% n`: the host random() behind the native_sim

@@ -2,24 +2,11 @@
  * Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
- *
- * Settings service of the mcubus (CONFIG_MCUBUS_SETTINGS): every MCU serves its own
- * settings (Zephyr settings subsystem) by name, and gets and sets those of the
- * others. Requests of the mcubus (mcubus/mcubus.h), one cmd with an op first:
- *
- *   MCUBUS_SETTINGS_CMD  MCUBUS_SETTINGS_GET, key, NUL          -> status, len, value
- *   MCUBUS_SETTINGS_CMD  MCUBUS_SETTINGS_SET, key, NUL, value   -> status
- *
- * The target runs the request in its interrupt: settings_runtime_get() or
- * settings_runtime_set(). These take no lock in the settings subsystem; they
- * look up the handler and call it. So the settings handlers must be static
- * (SETTINGS_STATIC_HANDLER_DEFINE), only copy memory, and keep their values
- * whole with a spinlock: they run in that interrupt and in threads. A handler
- * refuses to set a read-only setting (-EACCES). After a SET, a work item stores
- * the settings (settings_save()), never the interrupt.
- *
- * With CONFIG_MCUBUS_SHELL, the shell commands "mcubus get" and "mcubus set" do
- * the same.
+ */
+
+/**
+ * @file
+ * @brief Settings service of the mcubus.
  */
 
 #ifndef MCUBUS_SETTINGS_H_
@@ -27,25 +14,68 @@
 
 #include <stdint.h>
 
+/**
+ * @defgroup mcubus_settings Settings service
+ * @ingroup mcubus
+ * @{
+ *
+ * Every MCU serves its Zephyr settings by name and gets and sets those of the
+ * others (CONFIG_MCUBUS_SETTINGS).
+ *
+ *     request:  MCUBUS_SETTINGS_GET, key, NUL         payload: len, value
+ *     request:  MCUBUS_SETTINGS_SET, key, NUL, value  payload: none
+ *
+ * The target calls settings_runtime_get() / settings_runtime_set() in its I2C
+ * interrupt. So settings handlers must be static (SETTINGS_STATIC_HANDLER_DEFINE),
+ * only copy memory, and keep their values under a spinlock. A read-only setting
+ * refuses with -EACCES. After a set, a work item calls settings_save().
+ *
+ * Shell: <tt>mcubus get \<addr\> \<key\></tt>,
+ * <tt>mcubus set \<addr\> \<key\> \<text\></tt>
+ */
+
+/** cmd of the service */
 #define MCUBUS_SETTINGS_CMD 0x01
 
-/* The op, first byte of the data */
+/** Op: get a setting */
 #define MCUBUS_SETTINGS_GET 0
+/** Op: set a setting */
 #define MCUBUS_SETTINGS_SET 1
 
-#define MCUBUS_SETTINGS_KEY_MAX   CONFIG_MCUBUS_SETTINGS_KEY_MAX /* with the terminating NUL */
+/** Longest key, NUL included */
+#define MCUBUS_SETTINGS_KEY_MAX   CONFIG_MCUBUS_SETTINGS_KEY_MAX
+/** Longest value */
 #define MCUBUS_SETTINGS_VALUE_MAX CONFIG_MCUBUS_SETTINGS_VALUE_MAX
 
-/*
- * Get setting `key` of the MCU at `addr` into `data`; `addr` may be this MCU.
- * Returns the length of the value (it may be more than `len`), or -errno: -EIO
- * nobody answers at `addr`, -ENOENT no such setting (the handler of the subtree
- * says so), -EINVAL no handler for the subtree at all, or key or value too long,
- * -ENOTSUP the MCU at `addr` serves no settings.
+/**
+ * @brief Get a setting of an MCU.
+ *
+ * @param addr MCU, may be this one.
+ * @param key Name of the setting.
+ * @param data Value buffer.
+ * @param len Size of @p data; a longer value is cut.
+ *
+ * @return Length of the value, which may exceed @p len, or -errno:
+ * @retval -ENOENT No such setting.
+ * @retval -EINVAL No handler for the subtree, or key too long.
+ * @retval -ENOTSUP The MCU serves no settings.
  */
 int mcubus_settings_get(uint8_t addr, const char *key, void *data, uint8_t len);
 
-/* Set setting `key` of the MCU at `addr`, which stores it. 0, or -errno: -EACCES read-only. */
+/**
+ * @brief Set a setting of an MCU, which then stores it.
+ *
+ * @param addr MCU, may be this one.
+ * @param key Name of the setting.
+ * @param data Value.
+ * @param len Length of @p data, up to MCUBUS_SETTINGS_VALUE_MAX.
+ *
+ * @retval 0 Set.
+ * @retval -EACCES Read-only.
+ * @retval -errno See mcubus_settings_get().
+ */
 int mcubus_settings_set(uint8_t addr, const char *key, const void *data, uint8_t len);
+
+/** @} */
 
 #endif /* MCUBUS_SETTINGS_H_ */

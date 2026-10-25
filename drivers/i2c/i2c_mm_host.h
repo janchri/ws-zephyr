@@ -3,15 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Interface between the Zephyr side (i2c_mm_emul.c) and the Linux side
- * (i2c_mm_host.c) of the native_sim multi-master I2C bus.
- *
- * Every native_sim process is one MCU. The Linux side keeps the "wires" in
- * shared memory so that the processes can see each other: who owns the bus,
- * the arbitration, which process is a target at which address, and a mailbox
- * per target for the events the controller sends it.
- *
- * Plain C types only: this header is included by both sides.
+ * Between the Zephyr side (i2c_mm_emul.c) and the Linux side (i2c_mm_host.c)
+ * of the native_sim bus: the wires in shared memory. Plain C types only, both
+ * sides include it.
  */
 
 #ifndef I2C_MM_HOST_H_

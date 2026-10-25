@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* &i2c0 is the multi-master port of native_sim (ws-zephyr/drivers/i2c/i2c_mm_emul.c):
- * the processes with the same bus-id share one bus. Its children are the MCUs
- * on the bus, the same for both images; which of them an image is comes from
- * CMake: MCUBUS_SELF_LABEL is mcu_<NODE>.
- */
+/* The bus on native_sim (zephyr,i2c-mm-emul); MCUBUS_SELF_LABEL is mcu_<NODE> */
 
 / {
 	chosen {

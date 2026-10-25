@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* A board: its shell is on a UART over the bus, to the gateway */
+/* A board: shell on a UART to the gateway */
 
 / {
 	chosen {

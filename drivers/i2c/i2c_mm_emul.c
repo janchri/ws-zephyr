@@ -3,38 +3,13 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Multi-master I2C port for native_sim.
+ * Multi-master I2C port for native_sim (dts/bindings/i2c/zephyr,i2c-mm-emul.yaml).
  *
- * Every native_sim process is one MCU with one I2C block (controller + target).
- * The processes are wired together by the shared memory bus of i2c_mm_host.c.
+ * The wires are shared memory (i2c_mm_host.c). Target events raise this port's
+ * interrupt line; a watcher thread plays the target's bus hardware.
  *
- * What is modelled:
- *  - Bus ownership: a controller that finds the bus busy waits for the STOP.
- *  - Arbitration: controllers that start within the same START window compare
- *    address byte and first data bytes; the lower value wins (open drain), the
- *    others get -EAGAIN. Controllers that start later wait for the bus.
- *  - Interrupt-driven target: address match, every byte and STOP raise the
- *    port's native_sim interrupt line; the i2c_target callbacks run in that
- *    ISR. The target stretches SCL until the ISR is done.
- *  - Repeated START: the bus stays owned between the messages of a transfer.
- *
- * A watcher thread plays the part of the bus hardware of the target: it sees
- * the events other processes post for this port and raises the interrupt.
- *
- * The processes can only be as simultaneous as the host scheduler makes them,
- * so the START window is wide (start-window-us) compared to a real bus: masters
- * that start within it are treated as having started at the same time.
- *
- * Bus recovery: a test bench can stick the bus (a target holds SDA low, see
- * i2c_mm_emul_stick_bus()). A controller that finds it stuck recovers it before
- * its START, as a hardware driver that sees SDA low with no START on the bus;
- * i2c_recover_bus() does it on request.
- *
- * With the devicetree property `loopback`, unlike most hardware, a controller can
- * address the target of its own port: tests send raw transfers to it.
- *
- * Simplifications: no 10-bit addressing, no target buffer mode, identical
- * arbitration keys are decided by arrival order, one port per process.
+ * Not modelled: 10-bit addresses, target buffer mode, more than one port per
+ * process, identical arbitration keys (decided by arrival order).
  */
 
 #define DT_DRV_COMPAT zephyr_i2c_mm_emul
@@ -55,15 +30,14 @@ LOG_MODULE_REGISTER(i2c_mm_emul, CONFIG_I2C_LOG_LEVEL);
 BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) <= 1, "one multi-master port per process");
 
 #define MM_ISR_TIMEOUT_MS 50
-#define MM_POLL_US        50   /* how often the host side is looked at while the bus is busy */
-#define MM_IDLE_POLL_US   1000 /* and while nobody owns it: a START lasts longer than this */
+#define MM_POLL_US        50
+#define MM_IDLE_POLL_US   1000 /* a START lasts longer than this */
 
-/* What the controller tells the target through its interrupt */
 enum mm_event {
-	MM_EV_ADDR_W, /* address match, write */
-	MM_EV_ADDR_R, /* address match, read; delivers the first byte */
-	MM_EV_WRITE,  /* data byte from the controller */
-	MM_EV_READ,   /* controller wants the next byte */
+	MM_EV_ADDR_W,
+	MM_EV_ADDR_R, /* delivers the first byte */
+	MM_EV_WRITE,
+	MM_EV_READ,
 	MM_EV_STOP,
 };
 
@@ -78,15 +52,15 @@ struct mm_config {
 };
 
 struct mm_data {
-	struct k_mutex xfer_lock; /* one controller transfer at a time */
+	struct k_mutex xfer_lock;
 	struct k_sem isr_done;
 	uint32_t config;
 	uint32_t bit_us;
-	uint32_t join_us; /* controllers whose START falls in this window arbitrate */
+	uint32_t join_us;
 	struct i2c_target_config *target;
 	struct i2c_mm_emul_stats stats;
 
-	/* "Registers" the watcher fills in before it raises the interrupt */
+	/* filled in by the watcher before it raises the interrupt */
 	enum mm_event ev;
 	uint8_t byte;
 	int result;
@@ -99,8 +73,6 @@ static int64_t mm_now_us(void)
 {
 	return k_ticks_to_us_floor64(k_uptime_ticks());
 }
-
-/* ---- target side: interrupt service ------------------------------------ */
 
 static void mm_isr(const void *arg)
 {
@@ -136,7 +108,6 @@ static void mm_isr(const void *arg)
 	k_sem_give(&d->isr_done);
 }
 
-/* Bus hardware of the target: turns the events of other MCUs into interrupts */
 static void mm_watcher(void *p1, void *p2, void *p3)
 {
 	const struct device *dev = p1;
@@ -164,7 +135,7 @@ static void mm_watcher(void *p1, void *p2, void *p3)
 	}
 }
 
-/* Send an event to the target in `tslot` and wait for its ISR (SCL stretching) */
+/* Waits for the target's ISR, as SCL stretching */
 static int mm_port_event(int tslot, enum mm_event ev, uint8_t *byte)
 {
 	uint8_t answer;
@@ -184,9 +155,6 @@ static int mm_port_event(int tslot, enum mm_event ev, uint8_t *byte)
 	return result;
 }
 
-/* ---- controller side ---------------------------------------------------- */
-
-/* Take the bus, or lose it to another master. Returns 0, -EAGAIN or -EBUSY. */
 static int mm_bus_acquire(const struct device *dev, const uint8_t *key, int key_len)
 {
 	const struct mm_config *cfg = dev->config;
@@ -216,7 +184,6 @@ static int mm_bus_acquire(const struct device *dev, const uint8_t *key, int key_
 		k_usleep(MAX(d->bit_us, MM_POLL_US));
 	}
 
-	/* Hold START while competing masters can still join, then see who won */
 	for (;;) {
 		int r = i2c_mm_host_confirm(d->join_us);
 
@@ -252,7 +219,7 @@ static int mm_transfer(const struct device *dev, struct i2c_msg *msgs, uint8_t n
 		}
 	}
 
-	/* What is on the wire while masters compete: address, then the data */
+	/* arbitration key: what is on the wire while masters compete */
 	key[0] = (addr << 1) | (msgs[0].flags & I2C_MSG_READ);
 	if (!(msgs[0].flags & I2C_MSG_READ)) {
 		uint8_t n = MIN(msgs[0].len, I2C_MM_HOST_KEY_MAX - 1);
@@ -309,8 +276,6 @@ out:
 	k_mutex_unlock(&d->xfer_lock);
 	return ret;
 }
-
-/* ---- i2c driver api ------------------------------------------------------ */
 
 static int mm_set_speed(const struct device *dev, uint32_t speed)
 {
@@ -395,7 +360,6 @@ static int mm_recover_bus(const struct device *dev)
 {
 	struct mm_data *d = dev->data;
 
-	/* nine clocks let the stuck target finish its byte, then a STOP */
 	i2c_mm_host_set_stuck(0);
 	d->stats.recoveries++;
 	return 0;

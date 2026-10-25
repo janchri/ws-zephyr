@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 config UART_MCUBUS
-	bool "UART over the multi-master I2C bus"
+	bool "UART over the mcubus"
 	default y
 	depends on DT_HAS_ZEPHYR_MCUBUS_UART_ENABLED
 	depends on MCUBUS
@@ -11,8 +11,7 @@ config UART_MCUBUS
 	select UART_INTERRUPT_DRIVEN
 	select RING_BUFFER
 	help
-	  A byte stream to one other MCU on the bus, as a UART
-	  (dts/bindings/mcubus/zephyr,mcubus-uart.yaml).
+	  See dts/bindings/mcubus/zephyr,mcubus-uart.yaml.
 
 if UART_MCUBUS
 
@@ -27,29 +26,27 @@ config UART_MCUBUS_TX_BUF_SIZE
 config UART_MCUBUS_CHUNK
 	int "Most bytes in one request"
 	default 32
-	range 1 125
+	range 1 252
 	help
-	  Every request is a transfer of its own on the bus: longer ones take
-	  less overhead, shorter ones hold the bus for less time. A request
-	  (cmd, src, chunk) must fit CONFIG_I2C_MM_MSG_MAX.
+	  Longer chunks cost less overhead, shorter ones hold the bus for less
+	  time. Up to MCUBUS_DATA_MAX.
 
 config UART_MCUBUS_POLL_MS
-	int "Retry interval while the peer's buffer is full or the bus is taken"
+	int "Retry interval while the peer is full or the bus is taken, in ms"
 	default 5
 
 config UART_MCUBUS_THREAD_PRIORITY
-	int "Priority of the thread that sends and runs the UART callbacks"
+	int "Priority of the UART thread"
 	default 2
 
 config UART_MCUBUS_THREAD_STACK_SIZE
-	int "Stack size of that thread"
+	int "Stack size of the UART thread"
 	default 1536
 
 endif # UART_MCUBUS
 
-# A shell on this UART uses its interrupt-driven API, which also hands SMP frames
-# to MCUmgr's shell transport; Zephyr's default is polling wherever the native
-# PTY driver is built (native_sim), whatever UART the shell is on
+# Interrupt-driven, as MCUmgr's shell transport needs; Zephyr defaults to polling
+# on native_sim
 DT_CHOSEN_SHELL_UART := zephyr,shell-uart
 DT_COMPAT_MCUBUS_UART := zephyr,mcubus-uart
 

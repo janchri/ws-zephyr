@@ -17,14 +17,9 @@
 
 LOG_MODULE_REGISTER(hello, LOG_LEVEL_INF);
 
-/* ---- the echo service: an application's own, cmd 0x80 and up ------------- */
-
 #define ECHO_CMD 0x80
 
-/*
- * The payload of the response is who sent the request, then its data. Runs in the
- * I2C target interrupt: short, and only copying.
- */
+/* Runs in the I2C target interrupt: short, and only copying */
 static int echo(const struct mcubus_req *req, uint8_t *rsp)
 {
 	rsp[0] = req->src;
@@ -34,9 +29,6 @@ static int echo(const struct mcubus_req *req, uint8_t *rsp)
 
 MCUBUS_SERVICE_DEFINE(echo_service, ECHO_CMD, echo);
 
-/* ---- calling the other MCU --------------------------------------------- */
-
-/* The other MCU on the bus (boards/native_sim.overlay) */
 #define ADDR(node) DT_REG_ADDR(node),
 static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(zephyr_mcubus_node, ADDR)};
 
@@ -54,7 +46,7 @@ static int wait_for(uint8_t addr)
 	for (int i = 0; i < 50; i++) {
 		ret = mcubus_ping(addr, &info);
 		if (ret != -EIO) {
-			break; /* -EIO: nobody there yet */
+			break;
 		}
 		k_msleep(100);
 	}

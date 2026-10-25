@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* The gateway: a UART over the bus to the board, bridged to a PTY for the laptop */
+/* The gateway: a UART to the board, bridged to a PTY */
 
 / {
 	bus_uart_a: bus-uart-a {

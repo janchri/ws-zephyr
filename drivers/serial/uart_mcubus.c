@@ -3,22 +3,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * UART over the multi-master I2C bus: a byte stream to one other MCU, `peer`.
+ * UART over the mcubus (dts/bindings/mcubus/zephyr,mcubus-uart.yaml).
  *
- * Sending is pushing: the bytes written to the UART are sent to the peer in
- * requests of the mcubus, UART_MCUBUS_CMD: up to CONFIG_UART_MCUBUS_CHUNK
- * bytes. The response is how many of them the peer
- * took; the rest stays and is sent again. So a full receive buffer holds the
- * sender back instead of losing bytes. If nobody answers at the peer's address,
- * or it has no UART for this MCU, the bytes are dropped, like on a UART without
- * a cable.
+ *     request:  UART_MCUBUS_CMD, chunk of up to CONFIG_UART_MCUBUS_CHUNK bytes
+ *     payload:  how many bytes the peer took
  *
- * Receiving runs in the I2C target interrupt (mcubus service): the bytes go to
- * the receive buffer of the UART whose peer sent them (`src` of the request).
+ * What the peer did not take is sent again, so a full receive buffer holds the
+ * sender back. If nobody answers, the bytes are dropped, as without a cable.
+ * Received bytes go to the UART whose peer is the request's src.
  *
- * One thread does the bus transfers of all UARTs of this MCU, and plays the
- * UART interrupt: it calls the interrupt-driven API callback while RX data is
- * there or TX room is, with that interrupt enabled.
+ * One thread sends for all UARTs and plays their interrupt for the
+ * interrupt-driven API.
  */
 
 #define DT_DRV_COMPAT zephyr_mcubus_uart
@@ -34,14 +29,12 @@
 
 LOG_MODULE_REGISTER(uart_mcubus, CONFIG_UART_LOG_LEVEL);
 
-/* The cmd of the service, see <mcubus/mcubus.h> */
 #define UART_MCUBUS_CMD 0x10
 
 #define CHUNK CONFIG_UART_MCUBUS_CHUNK
 
 BUILD_ASSERT(CHUNK <= MCUBUS_DATA_MAX, "a chunk must fit CONFIG_I2C_MM_MSG_MAX");
 
-/* Blocking uart_poll_out() gives up on a full buffer after this long */
 #define POLL_OUT_TIMEOUT_MS 100
 
 struct mu_config {
@@ -60,12 +53,9 @@ struct mu_data {
 	bool tx_irq;
 };
 
-/* Wakes the thread: there is something to send, or a callback to run */
 static K_SEM_DEFINE(kick, 0, 1);
 
 extern const k_tid_t uart_mcubus_thread;
-
-/* ---- interrupt-driven API, played by the thread ------------------------------ */
 
 static int mu_fifo_fill(const struct device *dev, const uint8_t *buf, int size)
 {
@@ -97,10 +87,7 @@ static int mu_poll_in(const struct device *dev, unsigned char *c)
 	return mu_fifo_read(dev, c, 1) == 1 ? 0 : -1;
 }
 
-/*
- * Waits for room while it can; in an interrupt, and in the thread that makes the
- * room, a full buffer drops the byte
- */
+/* Cannot wait in an interrupt, nor in the thread that makes the room */
 static void mu_poll_out(const struct device *dev, unsigned char c)
 {
 	if (k_is_in_isr() || k_current_get() == uart_mcubus_thread) {
@@ -185,7 +172,6 @@ static void mu_irq_callback_set(const struct device *dev, uart_irq_callback_user
 	d->cb_data = user_data;
 }
 
-/* The "interrupt": run the callback if it has something to do */
 static void mu_irq_run(const struct device *dev)
 {
 	struct mu_data *d = dev->data;
@@ -235,9 +221,6 @@ DT_INST_FOREACH_STATUS_OKAY(MU_INST)
 
 static const struct device *const uarts[] = {DT_INST_FOREACH_STATUS_OKAY(MU_DEV)};
 
-/* ---- receiving: the mcubus service, in the I2C target interrupt -------------- */
-
-/* The data is the bytes; the payload of the response is how many were taken */
 static int mu_receive(const struct mcubus_req *req, uint8_t *rsp)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(uarts); i++) {
@@ -257,14 +240,12 @@ static int mu_receive(const struct mcubus_req *req, uint8_t *rsp)
 		rsp[0] = n;
 		return 1;
 	}
-	return -ENODEV; /* no UART for that MCU */
+	return -ENODEV;
 }
 
 MCUBUS_SERVICE_DEFINE(uart_mcubus_service, UART_MCUBUS_CMD, mu_receive);
 
-/* ---- sending ------------------------------------------------------------------- */
-
-/* Send one chunk to the peer. Returns 1 if bytes went, 0 if there were none, -EAGAIN. */
+/* 1: bytes went, 0: none to send, -EAGAIN: try again later */
 static int mu_send(const struct device *dev)
 {
 	const struct mu_config *cfg = dev->config;
@@ -286,7 +267,6 @@ static int mu_send(const struct device *dev)
 		return -EAGAIN;
 	}
 	if (ret) {
-		/* nobody there, or no UART for us there: like a UART without a cable */
 		taken = n;
 	}
 	K_SPINLOCK(&d->lock) {
@@ -309,7 +289,7 @@ static void mu_thread(void *p1, void *p2, void *p3)
 			mu_irq_run(uarts[i]);
 			ret = mu_send(uarts[i]);
 			if (ret > 0) {
-				mu_irq_run(uarts[i]); /* room again in the TX buffer */
+				mu_irq_run(uarts[i]);
 				wait = K_NO_WAIT;
 			} else if (ret < 0 && K_TIMEOUT_EQ(wait, K_FOREVER)) {
 				wait = K_MSEC(CONFIG_UART_MCUBUS_POLL_MS);

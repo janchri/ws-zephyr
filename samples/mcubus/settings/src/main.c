@@ -24,8 +24,6 @@
 
 LOG_MODULE_REGISTER(settings_sample, LOG_LEVEL_INF);
 
-/* ---- the settings of this MCU -------------------------------------------- */
-
 /*
  * The other MCU's requests run in the I2C target interrupt, and so do these
  * handlers: static, short, and the greeting under a spinlock
@@ -50,7 +48,6 @@ static int mcu_get(const char *key, char *val, int val_len_max)
 	return len;
 }
 
-/* From the other MCU, and from flash at boot (settings_load()) */
 static int mcu_set(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	char val[sizeof(greeting)];
@@ -76,7 +73,6 @@ static int mcu_set(const char *key, size_t len, settings_read_cb read_cb, void *
 	return 0;
 }
 
-/* What settings_save() stores, after the other MCU has set something */
 static int mcu_export(int (*export_func)(const char *name, const void *val, size_t val_len))
 {
 	char val[sizeof(greeting)];
@@ -91,9 +87,6 @@ static int mcu_export(int (*export_func)(const char *name, const void *val, size
 
 SETTINGS_STATIC_HANDLER_DEFINE(mcu, "mcu", mcu_get, mcu_set, NULL, mcu_export);
 
-/* ---- the settings of the other MCU --------------------------------------- */
-
-/* The other MCU on the bus (boards/native_sim.overlay) */
 #define ADDR(node) DT_REG_ADDR(node),
 static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(zephyr_mcubus_node, ADDR)};
 
@@ -111,7 +104,7 @@ static int wait_for(uint8_t addr)
 	for (int i = 0; i < 50; i++) {
 		ret = mcubus_ping(addr, &info);
 		if (ret != -EIO) {
-			break; /* -EIO: nobody there yet */
+			break;
 		}
 		k_msleep(100);
 	}

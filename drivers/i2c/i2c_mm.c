@@ -18,17 +18,12 @@ void i2c_mm_get_stats(const struct i2c_mm *mm, struct i2c_mm_stats *stats)
 	*stats = mm->stats;
 }
 
-/* ---- target side: runs in the I2C interrupt ------------------------------ */
-
 static uint8_t next_byte(struct i2c_mm *mm)
 {
 	return mm->tx_pos < mm->tx_len ? mm->tx[mm->tx_pos++] : 0xff;
 }
 
-/*
- * At the start of a write, and at STOP: a request that was written but never read
- * (its controller gave up) is not run, then or later
- */
+/* A request whose read never came is not run, then or later */
 static int forget_request(struct i2c_target_config *cfg)
 {
 	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
@@ -42,24 +37,19 @@ static int write_received(struct i2c_target_config *cfg, uint8_t val)
 	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
 
 	if (mm->rx_len >= sizeof(mm->rx)) {
-		return -ENOMEM; /* NACK: request too long */
+		return -ENOMEM;
 	}
 	mm->rx[mm->rx_len++] = val;
 	return 0;
 }
 
-/*
- * The read of the response begins: answer the request that was written. Then
- * forget it, so that a read alone gets an empty request instead of running the
- * last request again.
- */
 static int read_requested(struct i2c_target_config *cfg, uint8_t *val)
 {
 	struct i2c_mm *mm = CONTAINER_OF(cfg, struct i2c_mm, cfg);
 
 	mm->tx_len = mm->cb(mm, mm->rx, mm->rx_len, mm->tx, sizeof(mm->tx));
 	mm->tx_pos = 0;
-	mm->rx_len = 0;
+	mm->rx_len = 0; /* a read alone must not run it again */
 	mm->stats.served++;
 	*val = next_byte(mm);
 	return 0;
@@ -91,6 +81,7 @@ int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_
 	}
 	mm->i2c = i2c;
 	mm->cb = cb;
+	k_mutex_init(&mm->lock);
 	mm->cfg.address = addr;
 	mm->cfg.callbacks = &target_cb;
 	ret = i2c_target_register(i2c, &mm->cfg);
@@ -100,9 +91,6 @@ int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_
 	return ret;
 }
 
-/* ---- controller side ------------------------------------------------------- */
-
-/* A request of this MCU to itself: the callback runs here, the rest reads as 0xff */
 static void transfer_self(struct i2c_mm *mm, const uint8_t *req, size_t req_len, uint8_t *rsp,
 			  size_t rsp_len)
 {
@@ -127,19 +115,24 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 	}
 
 	for (uint32_t i = 1;; i++) {
-		int ret = i2c_write_read(mm->i2c, addr, req, req_len, rsp, rsp_len);
+		int ret;
 
+		/* re-registering must not hit another thread's transfer */
+		k_mutex_lock(&mm->lock, K_FOREVER);
+		ret = i2c_write_read(mm->i2c, addr, req, req_len, rsp, rsp_len);
 		if (IS_ENABLED(CONFIG_I2C_MM_TARGET_REREGISTER)) {
-			/* the driver left target mode for the transfer */
 			(void)i2c_target_register(mm->i2c, &mm->cfg);
 		}
 		if (ret == 0) {
 			mm->stats.sent++;
+		} else if (ret == -EAGAIN || ret == -EBUSY) {
+			mm->stats.retries++;
 		}
+		k_mutex_unlock(&mm->lock);
+
 		if ((ret != -EAGAIN && ret != -EBUSY) || k_uptime_get() >= end) {
 			return ret;
 		}
-		mm->stats.retries++;
 		LOG_WRN("0x%02x: request to 0x%02x attempt %u: %s, backing off", i2c_mm_addr(mm),
 			addr, i, ret == -EAGAIN ? "lost arbitration" : "bus busy");
 		/* out of the winner's START window, then wait for its STOP */

@@ -2,34 +2,11 @@
  * Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
- *
- * Requests between the MCUs on a multi-master I2C bus of equal peers.
- *
- * This MCU is the devicetree node /chosen zephyr,mcubus-self: a
- * "zephyr,mcubus-node" child of its I2C bus, at its address. From boot on it
- * serves requests at that address, and it sends requests to the other MCUs
- * (mcubus_request()). The bytes go over the multi-master I2C link
- * (<drivers/i2c/i2c_mm.h>), one transfer per request:
- *
- *   request:   cmd, src, data
- *   response:  status, payload    (status negative is -errno, then no payload)
- *
- * `src` is the address of the sender: an I2C target cannot see who the
- * controller is.
- *
- * The cmd picks a service (MCUBUS_SERVICE_DEFINE); a cmd that no service has
- * gets -ENOTSUP. The target runs the service in its interrupt, when the read
- * begins, so a service must be short and only copy memory. A request of the MCU
- * to itself does not go over the bus: the service runs in the calling thread.
- *
- * Controllers that start at the same moment arbitrate, and the lowest frame wins:
- * address byte, then cmd. A lower cmd has the higher priority. Every service has
- * a cmd of its own, defined in its own header:
- *
- *   0x00        ping       <mcubus/ping.h>
- *   0x01        settings   <mcubus/settings.h>
- *   0x10        UART       drivers/serial/uart_mcubus.c
- *   0x80..0xff  for applications
+ */
+
+/**
+ * @file
+ * @brief Requests between equal MCUs on a multi-master I2C bus.
  */
 
 #ifndef MCUBUS_H_
@@ -42,69 +19,138 @@
 
 #include <drivers/i2c/i2c_mm.h>
 
-/* Version of the requests; every MCU on a bus needs the same */
+/**
+ * @defgroup mcubus mcubus
+ * @{
+ *
+ * This MCU is /chosen zephyr,mcubus-self, a "zephyr,mcubus-node" on its I2C bus.
+ * It serves requests at its address from boot on and sends requests to the
+ * others, one link transfer each (@ref i2c_mm):
+ *
+ *     request:   cmd, src, flags, data
+ *     response:  status, payload
+ *
+ * @c cmd selects the service, @c src is the sender's address, @c flags is
+ * reserved: written as 0, ignored on receipt. @c status is 0 or an errno
+ * without its sign; an error has no payload.
+ *
+ * The lowest frame wins arbitration, so a lower cmd has the higher priority.
+ * Allocated cmds: 0x00 ping, 0x01 settings, 0x10 UART; 0x80..0xff are for
+ * applications.
+ */
+
+/** Protocol version; every MCU on a bus needs the same */
 #define MCUBUS_PROTOCOL_VERSION 1
 
-/* Longest request (cmd and src included) and longest response (status included) */
+/** Longest request and longest response, header and status included */
 #define MCUBUS_MSG_MAX I2C_MM_MSG_MAX
 
-/* Longest data of a request, and longest payload of a response */
-#define MCUBUS_DATA_MAX    (MCUBUS_MSG_MAX - 2)
+/** Request header: cmd, src, flags */
+#define MCUBUS_HDR_LEN 3
+
+/** Longest data of a request */
+#define MCUBUS_DATA_MAX (MCUBUS_MSG_MAX - MCUBUS_HDR_LEN)
+
+/** Longest payload of a response */
 #define MCUBUS_PAYLOAD_MAX (MCUBUS_MSG_MAX - 1)
 
-/* This MCU in the devicetree */
+/** Devicetree node of this MCU */
 #define MCUBUS_SELF DT_CHOSEN(zephyr_mcubus_self)
 
-/* A request, as a service gets it */
+/** @brief A request as a service gets it */
 struct mcubus_req {
-	uint8_t src; /* address of the MCU that sent it */
+	/** Address of the sender */
+	uint8_t src;
+	/** Data after the header */
 	const uint8_t *data;
+	/** Length of @p data */
 	size_t len;
 };
 
+/** @brief A service */
 struct mcubus_service {
+	/** cmd it serves */
 	uint8_t cmd;
-	/*
-	 * Write the payload of the response to `rsp` (room for MCUBUS_PAYLOAD_MAX
-	 * bytes) and return its length, or return -errno. The status byte in front
-	 * of the payload is mcubus's: 0, or that -errno alone.
+	/**
+	 * @brief Answer a request.
+	 *
+	 * Runs in the I2C target interrupt, or in the sending thread for a request
+	 * of this MCU to itself, possibly both at once: keep it short, and shared
+	 * state under a spinlock. Must not return -EIO, -EAGAIN or -EBUSY, which
+	 * mean "bus" to the caller.
+	 *
+	 * @param req Request.
+	 * @param rsp Payload to write, room for MCUBUS_PAYLOAD_MAX bytes.
+	 *
+	 * @return Length of the payload, or -errno.
 	 */
 	int (*handle)(const struct mcubus_req *req, uint8_t *rsp);
 };
 
+/**
+ * @brief Define a service.
+ *
+ * @param name Name of the definition.
+ * @param _cmd cmd it serves; unique on the MCU, else mcubus does not start.
+ * @param _handle Handler, see mcubus_service::handle.
+ */
 #define MCUBUS_SERVICE_DEFINE(name, _cmd, _handle)                                                 \
 	static const STRUCT_SECTION_ITERABLE(mcubus_service, name) = {                             \
 		.cmd = _cmd,                                                                       \
 		.handle = _handle,                                                                 \
 	}
 
-/* Name (devicetree node) and I2C address of this MCU, and its link to the bus */
+/** @brief Name of this MCU. @return Its devicetree node name. */
 const char *mcubus_name(void);
+
+/** @brief I2C address of this MCU. @return Address. */
 uint8_t mcubus_addr(void);
+
+/** @brief Link of this MCU to the bus. @return Link. */
 const struct i2c_mm *mcubus_link(void);
 
-/*
- * Send request `cmd`, `data` to the MCU at `addr` and read `rsp_len` bytes of the
- * payload of its response into `rsp` (bytes the service did not write read as
- * 0xff); `addr` may be this MCU. Returns 0; the -errno of the transfer
- * (i2c_mm_transfer()): -EIO nobody answers at `addr`, -EAGAIN / -EBUSY the bus
- * stayed taken; or the -errno the service answered.
+/**
+ * @brief Send a request and read the payload of the response.
  *
- * A request runs at most once on the target, but its controller may not learn
- * that it did: if the read of the response fails, the result is an error, and
- * the request may have run or not.
+ * Payload bytes the service did not write read as 0xff. A request to this MCU
+ * runs the service directly. A request runs at most once, but if reading the
+ * response fails, it may or may not have run.
+ *
+ * @param addr MCU to send to, may be this one.
+ * @param cmd Service.
+ * @param data Data of the request.
+ * @param len Length of @p data, up to MCUBUS_DATA_MAX.
+ * @param rsp Payload buffer.
+ * @param rsp_len Payload bytes to read, up to MCUBUS_PAYLOAD_MAX.
+ *
+ * @retval 0 Done.
+ * @retval -EIO Nobody answers at @p addr.
+ * @retval -EAGAIN Lost arbitration until the deadline.
+ * @retval -EBUSY Bus busy until the deadline.
+ * @retval -ENOTSUP No service for @p cmd there.
+ * @retval -errno Error of the service.
  */
 int mcubus_request(uint8_t addr, uint8_t cmd, const void *data, size_t len, void *rsp,
 		   size_t rsp_len);
 
-#ifdef CONFIG_MCUBUS_SHELL
+#if defined(CONFIG_MCUBUS_SHELL) || defined(__DOXYGEN__)
 struct shell;
 
-/*
- * For the shell commands of services, under "mcubus" (SHELL_SUBCMD_ADD((mcubus),
- * ...)): parse an I2C address. 0, or -EINVAL with an error printed.
+/**
+ * @brief Parse an I2C address, for shell commands of services.
+ *
+ * Services add their commands under "mcubus" with SHELL_SUBCMD_ADD((mcubus), ...).
+ *
+ * @param sh Shell, for the error.
+ * @param arg Text to parse.
+ * @param addr Address.
+ *
+ * @retval 0 Parsed.
+ * @retval -EINVAL Not an address; the error is printed.
  */
 int mcubus_shell_addr(const struct shell *sh, const char *arg, uint8_t *addr);
 #endif
+
+/** @} */
 
 #endif /* MCUBUS_H_ */

@@ -24,7 +24,9 @@
 #define CMD_COUNT  0x7e /* the test service */
 #define CMD_NONE   0x7d /* no service */
 #define CMD_ECHO   0x7c /* src, data */
+#define CMD_FAIL   0x7b /* answers -BIG_ERRNO */
 #define SRC        0x42 /* any sender */
+#define BIG_ERRNO  200  /* past 127, as ENOTSUP (134) with picolibc */
 
 static atomic_t runs;
 
@@ -47,15 +49,22 @@ static int echo(const struct mcubus_req *req, uint8_t *rsp)
 
 MCUBUS_SERVICE_DEFINE(test_echo_service, CMD_ECHO, echo);
 
-/* Raw transfers to this MCU's own target, over the bus: the request is cmd, src, data; the
- * response is status, payload
+static int fail(const struct mcubus_req *req, uint8_t *rsp)
+{
+	return -BIG_ERRNO;
+}
+
+MCUBUS_SERVICE_DEFINE(test_fail_service, CMD_FAIL, fail);
+
+/* Raw transfers to this MCU's own target, over the bus: the request is cmd, src, flags,
+ * data; the response is status, payload
  */
 static int request(const uint8_t *req, size_t req_len, uint8_t *rsp, size_t rsp_len)
 {
 	return i2c_write_read(mcubus_link()->i2c, ADDR, req, req_len, rsp, rsp_len);
 }
 
-static const uint8_t count_req[] = {CMD_COUNT, SRC};
+static const uint8_t count_req[] = {CMD_COUNT, SRC, 0};
 
 ZTEST(mcubus_faults, test_request)
 {
@@ -78,7 +87,7 @@ ZTEST(mcubus_faults, test_read_alone)
 	before = atomic_get(&runs);
 
 	zassert_ok(i2c_read(mcubus_link()->i2c, rsp, sizeof(rsp), ADDR));
-	zassert_equal((int8_t)rsp[0], -EINVAL);
+	zassert_equal(rsp[0], EINVAL);
 	zassert_equal(atomic_get(&runs), before, "the last request ran again");
 }
 
@@ -90,7 +99,7 @@ ZTEST(mcubus_faults, test_write_alone)
 
 	zassert_ok(i2c_write(mcubus_link()->i2c, count_req, sizeof(count_req), ADDR));
 	zassert_ok(i2c_read(mcubus_link()->i2c, rsp, sizeof(rsp), ADDR));
-	zassert_equal((int8_t)rsp[0], -EINVAL);
+	zassert_equal(rsp[0], EINVAL);
 	zassert_equal(atomic_get(&runs), before);
 }
 
@@ -114,7 +123,7 @@ ZTEST(mcubus_faults, test_lost_response)
 /* A request longer than MCUBUS_MSG_MAX is NACKed and not run; the next one works */
 ZTEST(mcubus_faults, test_too_long)
 {
-	uint8_t req[MCUBUS_MSG_MAX + 1] = {CMD_COUNT, SRC};
+	uint8_t req[MCUBUS_MSG_MAX + 1] = {CMD_COUNT, SRC, 0};
 	atomic_val_t before = atomic_get(&runs);
 	uint8_t rsp[2];
 
@@ -127,30 +136,55 @@ ZTEST(mcubus_faults, test_too_long)
 
 ZTEST(mcubus_faults, test_unknown_cmd)
 {
-	const uint8_t req[] = {CMD_NONE, SRC};
+	const uint8_t req[] = {CMD_NONE, SRC, 0};
 	uint8_t rsp[2];
 
 	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
-	zassert_equal((int8_t)rsp[0], -ENOTSUP);
+	zassert_equal(rsp[0], ENOTSUP);
 }
 
-/* A cmd without src is no request */
-ZTEST(mcubus_faults, test_no_src)
+/*
+ * An errno past 127 is an error, on the wire and as the result: native_sim's libc
+ * has ENOTSUP at 95, Zephyr's (picolibc, minimal) at 134
+ */
+ZTEST(mcubus_faults, test_big_errno)
 {
-	const uint8_t req[] = {CMD_COUNT};
+	const uint8_t req[] = {CMD_FAIL, SRC, 0};
+	uint8_t rsp[2];
+
+	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
+	zassert_equal(rsp[0], BIG_ERRNO);
+	zassert_equal(mcubus_request(ADDR, CMD_FAIL, NULL, 0, rsp, sizeof(rsp)), -BIG_ERRNO);
+}
+
+/* A request without its whole header (cmd, src, flags) is no request */
+ZTEST(mcubus_faults, test_short_header)
+{
+	const uint8_t req[] = {CMD_COUNT, SRC};
 	atomic_val_t before = atomic_get(&runs);
 	uint8_t rsp[2];
 
 	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
-	zassert_equal((int8_t)rsp[0], -EINVAL);
+	zassert_equal(rsp[0], EINVAL);
 	zassert_equal(atomic_get(&runs), before);
 }
 
 /* The service gets src and data as they were sent, and its payload comes back whole */
 ZTEST(mcubus_faults, test_echo)
 {
-	const uint8_t req[] = {CMD_ECHO, SRC, 1, 2, 3};
+	const uint8_t req[] = {CMD_ECHO, SRC, 0, 1, 2, 3};
 	const uint8_t want[] = {0, SRC, 1, 2, 3};
+	uint8_t rsp[sizeof(want)];
+
+	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
+	zassert_mem_equal(rsp, want, sizeof(want));
+}
+
+/* Flags are reserved: whatever a later version sends there, this one runs the request */
+ZTEST(mcubus_faults, test_flags_ignored)
+{
+	const uint8_t req[] = {CMD_ECHO, SRC, 0xff, 7};
+	const uint8_t want[] = {0, SRC, 7};
 	uint8_t rsp[sizeof(want)];
 
 	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
@@ -193,10 +227,10 @@ ZTEST(mcubus_ping, test_ping)
 	zassert_equal(info.msg_max, MCUBUS_MSG_MAX);
 }
 
-/* The same over the bus: cmd 0x00, src; response status, version, MCUBUS_MSG_MAX */
+/* The same over the bus: cmd 0x00, src, flags; response status, version, MCUBUS_MSG_MAX */
 ZTEST(mcubus_ping, test_ping_on_the_wire)
 {
-	const uint8_t req[] = {MCUBUS_PING_CMD, SRC};
+	const uint8_t req[] = {MCUBUS_PING_CMD, SRC, 0};
 	uint8_t rsp[3];
 
 	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));

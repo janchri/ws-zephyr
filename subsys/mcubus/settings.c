@@ -18,8 +18,6 @@ BUILD_ASSERT(1 + MCUBUS_SETTINGS_KEY_MAX + MCUBUS_SETTINGS_VALUE_MAX <= MCUBUS_D
 BUILD_ASSERT(1 + MCUBUS_SETTINGS_VALUE_MAX <= MCUBUS_PAYLOAD_MAX,
 	     "a GET response must fit CONFIG_I2C_MM_MSG_MAX");
 
-/* ---- the service, for the others or for this MCU ------------------------- */
-
 static void save(struct k_work *work)
 {
 	ARG_UNUSED(work);
@@ -29,7 +27,6 @@ static void save(struct k_work *work)
 
 static K_WORK_DEFINE(save_work, save);
 
-/* The payload of the response: len, value */
 static int get(const char *key, uint8_t *rsp)
 {
 	int ret = settings_runtime_get(key, &rsp[1], MCUBUS_SETTINGS_VALUE_MAX);
@@ -48,11 +45,10 @@ static int set(const char *key, const uint8_t *value, size_t len)
 	if (ret < 0) {
 		return ret;
 	}
-	k_work_submit(&save_work); /* not here: flash is slow, this may be an interrupt */
+	k_work_submit(&save_work); /* flash is too slow for the interrupt */
 	return 0;
 }
 
-/* The data is op, key, NUL; and the value for a SET */
 static int handle(const struct mcubus_req *req, uint8_t *rsp)
 {
 	const char *key = (const char *)&req->data[1];
@@ -74,9 +70,6 @@ static int handle(const struct mcubus_req *req, uint8_t *rsp)
 
 MCUBUS_SERVICE_DEFINE(mcubus_settings_service, MCUBUS_SETTINGS_CMD, handle);
 
-/* ---- requests -------------------------------------------------------------- */
-
-/* op, key, NUL into `req`: returns its length, or -EINVAL for a key that is too long */
 static int put_key(uint8_t *req, uint8_t op, const char *key)
 {
 	size_t key_len = strlen(key) + 1;
@@ -120,11 +113,8 @@ int mcubus_settings_set(uint8_t addr, const char *key, const void *data, uint8_t
 	return mcubus_request(addr, MCUBUS_SETTINGS_CMD, req, req_len + len, NULL, 0);
 }
 
-/* ---- shell ------------------------------------------------------------------- */
-
 #ifdef CONFIG_MCUBUS_SHELL
 
-/* mcubus get <addr> <key> */
 static int cmd_get(const struct shell *sh, size_t argc, char **argv)
 {
 	uint8_t val[MCUBUS_SETTINGS_VALUE_MAX];
@@ -141,7 +131,7 @@ static int cmd_get(const struct shell *sh, size_t argc, char **argv)
 		shell_error(sh, "0x%02x %s: %d", addr, argv[2], ret);
 		return ret;
 	}
-	len = MIN(ret, (int)sizeof(val)); /* a peer may have longer values */
+	len = MIN(ret, (int)sizeof(val));
 	for (int i = 0; i < len; i++) {
 		text = text && isprint(val[i]);
 	}
@@ -154,7 +144,6 @@ static int cmd_get(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-/* mcubus set <addr> <key> <text> */
 static int cmd_set(const struct shell *sh, size_t argc, char **argv)
 {
 	uint8_t addr;

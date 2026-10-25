@@ -4,33 +4,31 @@
 DT_CHOSEN_MCUBUS_SELF := zephyr,mcubus-self
 
 menuconfig MCUBUS
-	bool "Requests between the MCUs on a multi-master I2C bus"
+	bool "Requests between equal MCUs on a multi-master I2C bus"
 	default y if $(dt_chosen_enabled,$(DT_CHOSEN_MCUBUS_SELF))
 	depends on I2C
 	select I2C_MM
 	help
-	  This MCU (/chosen zephyr,mcubus-self) serves requests of the other
-	  MCUs, from boot on, and sends them requests, over the multi-master
-	  I2C link (CONFIG_I2C_MM). Services: ping (MCUBUS_PING), settings
-	  (MCUBUS_SETTINGS) and a UART (UART_MCUBUS). See <mcubus/mcubus.h>.
+	  On with /chosen zephyr,mcubus-self. See <mcubus/mcubus.h>.
 
 if MCUBUS
 
 config MCUBUS_INIT_PRIORITY
-	int "Init priority, after the I2C driver"
+	int "Init priority"
 	default 60
+	help
+	  After the I2C driver.
 
 config MCUBUS_SHELL
-	bool "Shell commands: mcubus stats, and those of the services"
+	bool "Shell commands"
 	default y
 	depends on SHELL
 
 config MCUBUS_PING
-	bool "Ping service: does an MCU answer, with which protocol"
+	bool "Ping service"
 	default y
 	help
-	  Every MCU should answer it: it is how the others check that it speaks
-	  their protocol. See <mcubus/ping.h>.
+	  Every MCU should answer it. See <mcubus/ping.h>.
 
 rsource "Kconfig.settings"
 
