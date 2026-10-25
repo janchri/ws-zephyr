@@ -3,316 +3,170 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Settings over the mcubus: one MCU of a bus of equal peers.
+ * Settings over the mcubus: one MCU of two. It serves its settings (Zephyr
+ * settings subsystem, subtree "mcu") to the other MCU, and gets and sets those
+ * of the other one by name (mcubus/settings.h):
  *
- * This image is one MCU. Its settings (Zephyr settings subsystem, subtree
- * "mcu") are read-only (r) or read/write (rw), and all MCUs get and set them by
- * name over the bus (mcubus/settings.h):
- *
- *   mcu/name       r   the devicetree node of the MCU
- *   mcu/version    r   APP_VERSION
- *   mcu/counter    r   the rounds of this MCU so far
- *   mcu/dump0..2   rw  any bytes, up to MCUBUS_SETTINGS_VALUE_MAX; kept in flash
- *
- * First every MCU pings the others: same protocol version, same limits. Then
- * every round, all MCUs at the very same moment send a random request to a
- * random MCU, maybe themselves, so the requests collide on the bus and the
- * lowest frame wins the arbitration; a little later they send another one. They
- * check the answer:
- *  - name and version are what the devicetree and the build say,
- *  - a counter never goes back, and cannot be set,
- *  - a dump is whole: whoever set it put a CRC into its last byte,
- *  - a setting that does not exist is not there.
- *
- * The MCUs on the bus and their I2C addresses are devicetree
- * (boards/native_sim.overlay, compatible "zephyr,mcubus-node"); the one this
- * image runs on is /chosen zephyr,mcubus-self, picked by -DNODE=<a|b|c>.
+ *   mcu/name       read-only   the devicetree node of the MCU
+ *   mcu/greeting   read/write  any text, kept in flash
  */
 
 #include <stdio.h>
 #include <string.h>
-#include <zephyr/device.h>
 #include <zephyr/kernel.h>
-#include <zephyr/spinlock.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/random/random.h>
 #include <zephyr/settings/settings.h>
-#include <zephyr/sys/crc.h>
+#include <zephyr/spinlock.h>
 
-#include <drivers/i2c/i2c_mm_emul.h>
 #include <mcubus/mcubus.h>
+#include <mcubus/ping.h>
 #include <mcubus/settings.h>
 
-LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(settings_sample, LOG_LEVEL_INF);
 
-#define APP_VERSION "1.0.0"
-#define DUMPS       3
-#define ROUNDS      20
-#define PERIOD_MS   100
-#define PROBE_ADDR  0x55 /* nobody there */
-
-/* All MCUs on the bus */
-#define MCU(node)  DT_REG_ADDR(node),
-#define NAME(node) DT_NODE_FULL_NAME(node),
-
-static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(zephyr_mcubus_node, MCU)};
-static const char *const names[] = {DT_FOREACH_STATUS_OKAY(zephyr_mcubus_node, NAME)};
-
-#define NUM_MCUS ARRAY_SIZE(mcus)
-
-BUILD_ASSERT(NUM_MCUS > 1, "no other MCU on the bus");
-
-static uint32_t bad; /* checks that failed */
-
-/* ---- my settings ------------------------------------------------------------ */
+/* ---- the settings of this MCU -------------------------------------------- */
 
 /*
- * The handlers run in the I2C target interrupt for the other MCUs, and in
- * threads for this one (settings_load(), settings_save(), any local use of the
- * settings API): `lock` keeps every value whole.
+ * The other MCU's requests run in the I2C target interrupt, and so do these
+ * handlers: static, short, and the greeting under a spinlock
  */
 static struct k_spinlock lock;
-static uint32_t counter;
-static struct {
-	uint8_t len; /* 0: not set */
-	uint8_t data[MCUBUS_SETTINGS_VALUE_MAX];
-} dumps[DUMPS];
-
-/* "dump<i>" to i, or -1 */
-static int dump_index(const char *key)
-{
-	if (strncmp(key, "dump", 4) == 0 && key[4] >= '0' && key[4] < '0' + DUMPS &&
-	    key[5] == '\0') {
-		return key[4] - '0';
-	}
-	return -1;
-}
+static char greeting[MCUBUS_SETTINGS_VALUE_MAX];
+static size_t greeting_len;
 
 static int mcu_get(const char *key, char *val, int val_len_max)
 {
-	int i = dump_index(key);
-	const void *src = NULL;
 	int len = -ENOENT;
 
 	if (settings_name_steq(key, "name", NULL)) {
-		src = mcubus_name();
 		len = strlen(mcubus_name());
-	} else if (settings_name_steq(key, "version", NULL)) {
-		src = APP_VERSION;
-		len = strlen(APP_VERSION);
-	} else if (settings_name_steq(key, "counter", NULL)) {
-		src = &counter;
-		len = sizeof(counter);
-	}
-
-	K_SPINLOCK(&lock) {
-		if (i >= 0) {
-			src = dumps[i].data;
-			len = dumps[i].len > 0 ? dumps[i].len : -ENOENT; /* 0: not set */
-		}
-		if (len > val_len_max) {
-			len = -ENOMEM;
-		} else if (len > 0) {
-			memcpy(val, src, len);
+		memcpy(val, mcubus_name(), MIN(len, val_len_max));
+	} else if (settings_name_steq(key, "greeting", NULL)) {
+		K_SPINLOCK(&lock) {
+			len = greeting_len;
+			memcpy(val, greeting, MIN(len, val_len_max));
 		}
 	}
 	return len;
 }
 
-/* Called by settings_load() with the stored dumps, and for a SET */
+/* From the other MCU, and from flash at boot (settings_load()) */
 static int mcu_set(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
-	uint8_t data[MCUBUS_SETTINGS_VALUE_MAX];
-	int i = dump_index(key);
+	char val[sizeof(greeting)];
 	ssize_t ret;
 
-	if (i < 0) {
-		/* no room: -ENOMEM for a setting there is, -ENOENT for one there is not */
-		return mcu_get(key, NULL, 0) == -ENOENT ? -ENOENT : -EACCES;
+	if (settings_name_steq(key, "name", NULL)) {
+		return -EACCES;
 	}
-	if (len == 0 || len > sizeof(dumps[i].data)) {
+	if (!settings_name_steq(key, "greeting", NULL)) {
+		return -ENOENT;
+	}
+	if (len > sizeof(val)) {
 		return -EINVAL;
 	}
-	ret = read_cb(cb_arg, data, len); /* not under the lock: may read flash */
+	ret = read_cb(cb_arg, val, len);
 	if (ret < 0) {
 		return ret;
 	}
 	K_SPINLOCK(&lock) {
-		memcpy(dumps[i].data, data, len);
-		dumps[i].len = len;
+		memcpy(greeting, val, len);
+		greeting_len = len;
 	}
 	return 0;
 }
 
-/* Called by settings_save(): the rw settings go to flash */
+/* What settings_save() stores, after the other MCU has set something */
 static int mcu_export(int (*export_func)(const char *name, const void *val, size_t val_len))
 {
-	for (int i = 0; i < DUMPS; i++) {
-		uint8_t data[MCUBUS_SETTINGS_VALUE_MAX];
-		char name[sizeof("mcu/dump0")];
-		uint8_t len;
+	char val[sizeof(greeting)];
+	size_t len;
 
-		K_SPINLOCK(&lock) { /* not export_func() under the lock: it writes flash */
-			len = dumps[i].len;
-			memcpy(data, dumps[i].data, len);
-		}
-
-		if (len > 0) {
-			snprintf(name, sizeof(name), "mcu/dump%c", '0' + i);
-			export_func(name, data, len);
-		}
+	K_SPINLOCK(&lock) {
+		len = greeting_len;
+		memcpy(val, greeting, len);
 	}
-	return 0;
+	return len > 0 ? export_func("mcu/greeting", val, len) : 0;
 }
 
 SETTINGS_STATIC_HANDLER_DEFINE(mcu, "mcu", mcu_get, mcu_set, NULL, mcu_export);
 
-/* ---- the requests ----------------------------------------------------------- */
+/* ---- the settings of the other MCU --------------------------------------- */
 
-/*
- * Random number in 0..n-1. Not `% n`: the host random() behind the native_sim
- * entropy driver has a weak lowest bit, and with consecutive seeds all MCUs
- * would draw the same sequence. Bits 8..23 are fine.
- */
-static uint32_t rand_below(uint32_t n)
+/* The other MCU on the bus (boards/native_sim.overlay) */
+#define ADDR(node) DT_REG_ADDR(node),
+static const uint8_t mcus[] = {DT_FOREACH_STATUS_OKAY(zephyr_mcubus_node, ADDR)};
+
+static uint8_t other_mcu(void)
 {
-	return (((sys_rand32_get() >> 8) & 0xffff) * n) >> 16;
+	return mcus[0] != mcubus_addr() ? mcus[0] : mcus[1];
 }
 
-static uint8_t dump_crc(const uint8_t *data, int len)
+/* The other MCU may still be booting: ping it until it answers */
+static int wait_for(uint8_t addr)
 {
-	return crc8_ccitt(0x00, data, len - 1);
-}
-
-static void check(uint8_t round, uint8_t addr, const char *what, bool ok, int ret)
-{
-	if (ok) {
-		LOG_INF("round %u: 0x%02x %s: %d", round, addr, what, ret);
-	} else {
-		LOG_ERR("round %u: 0x%02x %s: unexpected %d", round, addr, what, ret);
-		bad++;
-	}
-}
-
-static void random_request(uint8_t round)
-{
-	static uint32_t last_counter[NUM_MCUS];
-	int t = rand_below(NUM_MCUS);
-	uint8_t addr = mcus[t];
-	uint8_t buf[MCUBUS_SETTINGS_VALUE_MAX + 1] = {0}; /* room for a NUL */
-	char dump[sizeof("mcu/dump0")];
-	char what[sizeof("get mcu/dump0")];
-	uint32_t value = 0;
-	int len;
+	struct mcubus_info info;
 	int ret;
 
-	snprintf(dump, sizeof(dump), "mcu/dump%c", '0' + (int)rand_below(DUMPS));
-
-	switch (rand_below(7)) {
-	case 0:
-		ret = mcubus_settings_get(addr, "mcu/name", buf, MCUBUS_SETTINGS_VALUE_MAX);
-		check(round, addr, "get mcu/name", ret > 0 && strcmp(buf, names[t]) == 0, ret);
-		break;
-	case 1:
-		ret = mcubus_settings_get(addr, "mcu/version", buf, MCUBUS_SETTINGS_VALUE_MAX);
-		check(round, addr, "get mcu/version", ret > 0 && strcmp(buf, APP_VERSION) == 0,
-		      ret);
-		break;
-	case 2:
-		ret = mcubus_settings_get(addr, "mcu/counter", &value, sizeof(value));
-		check(round, addr, "get mcu/counter",
-		      ret == sizeof(value) && value >= last_counter[t], ret);
-		last_counter[t] = MAX(last_counter[t], value);
-		break;
-	case 3:
-		ret = mcubus_settings_set(addr, "mcu/counter", &value, sizeof(value));
-		check(round, addr, "set mcu/counter (read-only)", ret == -EACCES, ret);
-		break;
-	case 4:
-		len = 2 + rand_below(MCUBUS_SETTINGS_VALUE_MAX - 1);
-		sys_rand_get(buf, len - 1);
-		buf[len - 1] = dump_crc(buf, len);
-		ret = mcubus_settings_set(addr, dump, buf, len);
-		snprintf(what, sizeof(what), "set %s", dump);
-		check(round, addr, what, ret == 0, ret);
-		break;
-	case 5:
-		ret = mcubus_settings_get(addr, dump, buf, MCUBUS_SETTINGS_VALUE_MAX);
-		snprintf(what, sizeof(what), "get %s", dump); /* not set, or whole */
-		check(round, addr, what,
-		      ret == -ENOENT || (ret >= 2 && buf[ret - 1] == dump_crc(buf, ret)), ret);
-		break;
-	default:
-		ret = mcubus_settings_get(addr, "mcu/nothing", buf, MCUBUS_SETTINGS_VALUE_MAX);
-		check(round, addr, "get mcu/nothing", ret == -ENOENT, ret);
-		break;
+	for (int i = 0; i < 50; i++) {
+		ret = mcubus_ping(addr, &info);
+		if (ret != -EIO) {
+			break; /* -EIO: nobody there yet */
+		}
+		k_msleep(100);
 	}
+	return ret;
 }
 
 int main(void)
 {
-	struct i2c_mm_emul_stats s;
-	struct mcubus_stats bus;
-	uint8_t byte;
+	uint8_t peer = other_mcu();
+	char val[MCUBUS_SETTINGS_VALUE_MAX];
+	char hi[MCUBUS_SETTINGS_VALUE_MAX];
+	int len;
 	int ret;
+
+	BUILD_ASSERT(ARRAY_SIZE(mcus) == 2, "this sample is for two MCUs");
 
 	ret = settings_subsys_init();
 	if (ret == 0) {
 		ret = settings_load();
 	}
 	if (ret) {
-		LOG_ERR("%s: cannot load the settings: %d", mcubus_name(), ret);
-		return ret;
+		LOG_ERR("cannot load the settings: %d", ret);
+		return 0;
 	}
-	LOG_INF("%s at 0x%02x, version %s; dumps from flash: %u, %u, %u bytes", mcubus_name(),
-		mcubus_addr(), APP_VERSION, dumps[0].len, dumps[1].len, dumps[2].len);
+	LOG_INF("%s at 0x%02x, greeting from flash: \"%.*s\"", mcubus_name(), mcubus_addr(),
+		(int)greeting_len, greeting);
 
-	/* Test bench: the other MCUs are processes that start at their own pace */
-	ret = i2c_mm_emul_wait_nodes(mcubus_i2c(), NUM_MCUS);
+	ret = wait_for(peer);
 	if (ret) {
-		LOG_ERR("%s: the other MCUs did not show up", mcubus_name());
-		return ret;
+		LOG_ERR("no answer from 0x%02x: %d", peer, ret);
+		return 0;
 	}
 
-	/* Every MCU speaks our protocol, with our limits */
-	for (int i = 0; i < NUM_MCUS; i++) {
-		struct mcubus_info info;
+	len = mcubus_settings_get(peer, "mcu/name", val, sizeof(val));
+	if (len < 0) {
+		LOG_ERR("get mcu/name of 0x%02x: %d", peer, len);
+		return 0;
+	}
+	LOG_INF("0x%02x is %.*s", peer, MIN(len, (int)sizeof(val)), val);
 
-		ret = mcubus_ping(mcus[i], &info);
-		check(0, mcus[i], "ping", ret == 0, ret);
+	len = snprintf(hi, sizeof(hi), "hi from %s", mcubus_name());
+	ret = mcubus_settings_set(peer, "mcu/greeting", hi, MIN(len, (int)sizeof(hi) - 1));
+	if (ret) {
+		LOG_ERR("set mcu/greeting of 0x%02x: %d", peer, ret);
+		return 0;
 	}
 
-	/* The bus must NACK an address nobody has */
-	ret = mcubus_settings_get(PROBE_ADDR, "mcu/name", &byte, 1);
-	check(0, PROBE_ADDR, "get mcu/name (nobody there)", ret == -EIO, ret);
-
-	for (uint8_t round = 0; round < ROUNDS; round++) {
-		i2c_mm_emul_wait_round(mcubus_i2c(), round, PERIOD_MS);
-		K_SPINLOCK(&lock) {
-			counter++;
-		}
-		random_request(round);
-		k_msleep(rand_below(PERIOD_MS / 2));
-		random_request(round);
+	len = mcubus_settings_get(peer, "mcu/greeting", val, sizeof(val));
+	if (len < 0) {
+		LOG_ERR("get mcu/greeting of 0x%02x: %d", peer, len);
+		return 0;
 	}
+	LOG_INF("0x%02x mcu/greeting = \"%.*s\"", peer, MIN(len, (int)sizeof(val)), val);
 
-	/* The others finish their last round together with us, wait until they are done */
-	i2c_mm_emul_wait_round(mcubus_i2c(), ROUNDS + 1, PERIOD_MS);
-
-	i2c_mm_emul_get_stats(mcubus_i2c(), &s);
-	mcubus_get_stats(&bus);
-	LOG_INF("sent %u requests, served %u requests; %u bad; %u retries; lost arbitration %u, "
-		"bus timeouts %u, nacks %u, irqs %u",
-		bus.sent, bus.served, bad, bus.retries, s.arb_lost, s.bus_timeouts, s.nacks,
-		s.irqs);
-
-	/* How much an MCU serves is up to the others: scripts/run.sh checks that every request
-	 * that was sent was served
-	 */
-	if (bad == 0) {
-		LOG_INF("all settings verified");
-	} else {
-		LOG_ERR("settings check failed");
-	}
+	ret = mcubus_settings_set(peer, "mcu/name", "x", 1);
+	LOG_INF("0x%02x mcu/name is read-only: %d", peer, ret);
 	return 0;
 }

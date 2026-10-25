@@ -1,0 +1,41 @@
+/*
+ * Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* &i2c0 is the multi-master port of native_sim (ws-zephyr/drivers/i2c/i2c_mm_emul.c):
+ * the processes with the same bus-id share one bus. Its children are the MCUs
+ * on the bus, the same for both images; which of them an image is comes from
+ * CMake: MCUBUS_SELF_LABEL is mcu_<NODE>.
+ */
+
+/ {
+	chosen {
+		zephyr,mcubus-self = &MCUBUS_SELF_LABEL;
+	};
+
+	/* The gateway's port to the laptop (gateway.overlay enables it):
+	 * "pty-a connected to pseudotty: /dev/pts/N"
+	 */
+	host_a: pty-a {
+		compatible = "zephyr,native-pty-uart";
+		current-speed = <0>;
+		status = "disabled";
+	};
+};
+
+&i2c0 {
+	compatible = "zephyr,i2c-mm-emul";
+	bus-id = <3>;
+
+	mcu_a: mcu-a@10 {
+		compatible = "zephyr,mcubus-node";
+		reg = <0x10>;
+	};
+
+	mcu_gw: gw@70 {
+		compatible = "zephyr,mcubus-node";
+		reg = <0x70>;
+	};
+};

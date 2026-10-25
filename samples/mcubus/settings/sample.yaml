@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 sample:
-  name: Settings over the mcubus (native_sim)
+  name: Settings over the mcubus
 common:
   platform_allow:
     - native_sim
@@ -12,17 +12,12 @@ common:
     - i2c
     - settings
 tests:
-  # MCU a, started by twister; pytest/test_settings.py starts b and c next to
-  # it, from the builds below, on the same virtual bus
+  # MCU a, started by twister; pytest/test_settings.py starts b next to it
   sample.mcubus.settings:
     extra_args: NODE=a
     harness: pytest
     required_applications:
       - name: sample.mcubus.settings.node_b
-      - name: sample.mcubus.settings.node_c
   sample.mcubus.settings.node_b:
     extra_args: NODE=b
-    build_only: true
-  sample.mcubus.settings.node_c:
-    extra_args: NODE=c
     build_only: true

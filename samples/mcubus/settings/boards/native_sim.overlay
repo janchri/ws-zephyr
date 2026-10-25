@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* native_sim ships &i2c0 as a stock emulated controller; here it is the
- * multi-master port (ws-zephyr/drivers/i2c/i2c_mm_emul.c), wired to the other
- * MCUs. Its children are the MCUs on the bus: the address plan, in one place.
- * Which of them an image is comes from CMake: MCUBUS_SELF_LABEL is mcu_<NODE>.
+/* &i2c0 is the multi-master port of native_sim (ws-zephyr/drivers/i2c/i2c_mm_emul.c):
+ * the processes with the same bus-id share one bus. Its children are the MCUs
+ * on the bus, the same for both images; which of them an image is comes from
+ * CMake: MCUBUS_SELF_LABEL is mcu_<NODE>.
  */
 
 / {
@@ -20,11 +20,6 @@
 	compatible = "zephyr,i2c-mm-emul";
 	bus-id = <0>;
 
-	/* The MCUs are processes that the host scheduler wakes up within about a
-	 * millisecond of each other: that is what counts as "at the same moment"
-	 */
-	start-window-us = <2000>;
-
 	mcu_a: mcu-a@10 {
 		compatible = "zephyr,mcubus-node";
 		reg = <0x10>;
@@ -33,10 +28,5 @@
 	mcu_b: mcu-b@11 {
 		compatible = "zephyr,mcubus-node";
 		reg = <0x11>;
-	};
-
-	mcu_c: mcu-c@12 {
-		compatible = "zephyr,mcubus-node";
-		reg = <0x12>;
 	};
 };

@@ -5,10 +5,10 @@
  *
  * Settings service of the mcubus (CONFIG_MCUBUS_SETTINGS): every MCU serves its own
  * settings (Zephyr settings subsystem) by name, and gets and sets those of the
- * others. Requests of the mcubus (mcubus/mcubus.h):
+ * others. Requests of the mcubus (mcubus/mcubus.h), one cmd with an op first:
  *
- *   MCUBUS_CMD_SETTINGS_GET  key, NUL          -> status, len, value
- *   MCUBUS_CMD_SETTINGS_SET  key, NUL, value   -> status
+ *   MCUBUS_SETTINGS_CMD  MCUBUS_SETTINGS_GET, key, NUL          -> status, len, value
+ *   MCUBUS_SETTINGS_CMD  MCUBUS_SETTINGS_SET, key, NUL, value   -> status
  *
  * The target runs the request in its interrupt: settings_runtime_get() or
  * settings_runtime_set(). These take no lock in the settings subsystem; they
@@ -26,6 +26,12 @@
 #define MCUBUS_SETTINGS_H_
 
 #include <stdint.h>
+
+#define MCUBUS_SETTINGS_CMD 0x01
+
+/* The op, first byte of the data */
+#define MCUBUS_SETTINGS_GET 0
+#define MCUBUS_SETTINGS_SET 1
 
 #define MCUBUS_SETTINGS_KEY_MAX   CONFIG_MCUBUS_SETTINGS_KEY_MAX /* with the terminating NUL */
 #define MCUBUS_SETTINGS_VALUE_MAX CONFIG_MCUBUS_SETTINGS_VALUE_MAX

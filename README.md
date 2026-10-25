@@ -99,10 +99,10 @@ This guide provides step-by-step instructions to initialize and configure a Zeph
 
 ## What is in the module
 
-- **mcubus**: equal MCUs on one multi-master I2C bus, with settings and a UART (shell, console) between them, and an emulated bus for native_sim. See [doc/mcubus.md](doc/mcubus.md); samples in `samples/mcubus/`, tests in `tests/subsys/mcubus/`.
+- **mcubus**: equal MCUs on one multi-master I2C bus, with settings and a UART (shell, console) between them, and an emulated bus for native_sim. See [doc/mcubus.md](doc/mcubus.md); samples in `samples/mcubus/` (`hello`, `settings`, `uart`, `smp`), tests in `tests/subsys/mcubus/` (`api`, `stress`), and all of it together in `applications/mcubus-system/`. `scripts/mcubus_run.sh` runs the MCUs of one of them on native_sim.
 
    ```bash
-   west twister -p native_sim -T ws-zephyr/samples -T ws-zephyr/tests
+   west twister -p native_sim -T ws-zephyr/samples -T ws-zephyr/tests -T ws-zephyr/applications/mcubus-system
    ```
 
 ## Coding style

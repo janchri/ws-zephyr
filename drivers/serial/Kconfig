@@ -31,7 +31,7 @@ config UART_MCUBUS_CHUNK
 	help
 	  Every request is a transfer of its own on the bus: longer ones take
 	  less overhead, shorter ones hold the bus for less time. A request
-	  (cmd, source, chunk) must fit CONFIG_MCUBUS_MSG_MAX.
+	  (cmd, src, chunk) must fit CONFIG_I2C_MM_MSG_MAX.
 
 config UART_MCUBUS_POLL_MS
 	int "Retry interval while the peer's buffer is full or the bus is taken"

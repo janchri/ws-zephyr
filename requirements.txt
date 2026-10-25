@@ -12,6 +12,7 @@ pre-commit-hooks==6.0.0
 clang-format==22.1.1
 ruff==0.14.2
 
-# MCUmgr (SMP) from the laptop, and MCUboot images: samples/mcubus/shell
+# MCUmgr (SMP) from the laptop, and MCUboot images: samples/mcubus/smp,
+# applications/mcubus-system
 smpclient==7.3.0
 imgtool==2.5.0

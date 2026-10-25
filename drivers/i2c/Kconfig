@@ -11,3 +11,43 @@ config I2C_MM_EMUL
 	  several native_sim processes (dts/bindings/i2c/zephyr,i2c-mm-emul.yaml).
 	  Include <drivers/i2c/i2c_mm_emul.h> for its statistics and the test
 	  bench helpers.
+
+menuconfig I2C_MM
+	bool "Messages between equal MCUs on a multi-master I2C bus"
+	select I2C_TARGET
+	help
+	  This MCU serves requests at its address as an I2C target and sends
+	  requests to the others as a controller; a request and its response
+	  are one transfer. Agnostic of what the bytes mean: mcubus
+	  (CONFIG_MCUBUS) builds on it. See <drivers/i2c/i2c_mm.h>.
+
+if I2C_MM
+
+config I2C_MM_MSG_MAX
+	int "Longest request or response"
+	default 64
+	range 8 255
+	help
+	  In bytes. Every MCU on the bus needs the same value.
+
+config I2C_MM_RETRY_MS
+	int "How long a request is retried after lost arbitration or a busy bus"
+	default 500
+	help
+	  The lowest frame always wins the arbitration: a request with a high
+	  frame can wait behind every other transfer of a busy bus.
+
+config I2C_MM_TARGET_REREGISTER
+	bool "Register the target again after every transfer"
+	default y if DT_HAS_SNPS_DESIGNWARE_I2C_ENABLED
+	help
+	  For I2C drivers that switch the block to controller mode for a transfer
+	  and do not switch back to target mode afterwards, such as Zephyr's
+	  DesignWare driver (Raspberry Pi Pico). Until it is registered again, the
+	  MCU does not answer at its address.
+
+module = I2C_MM
+module-str = i2c_mm
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # I2C_MM

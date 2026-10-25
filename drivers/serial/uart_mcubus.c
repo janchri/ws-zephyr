@@ -6,15 +6,15 @@
  * UART over the multi-master I2C bus: a byte stream to one other MCU, `peer`.
  *
  * Sending is pushing: the bytes written to the UART are sent to the peer in
- * requests of the mcubus, MCUBUS_CMD_UART: source address, up to
- * CONFIG_UART_MCUBUS_CHUNK bytes. The response is how many of them the peer
+ * requests of the mcubus, UART_MCUBUS_CMD: up to CONFIG_UART_MCUBUS_CHUNK
+ * bytes. The response is how many of them the peer
  * took; the rest stays and is sent again. So a full receive buffer holds the
  * sender back instead of losing bytes. If nobody answers at the peer's address,
  * or it has no UART for this MCU, the bytes are dropped, like on a UART without
  * a cable.
  *
  * Receiving runs in the I2C target interrupt (mcubus service): the bytes go to
- * the receive buffer of the UART whose peer is the source address.
+ * the receive buffer of the UART whose peer sent them (`src` of the request).
  *
  * One thread does the bus transfers of all UARTs of this MCU, and plays the
  * UART interrupt: it calls the interrupt-driven API callback while RX data is
@@ -34,9 +34,12 @@
 
 LOG_MODULE_REGISTER(uart_mcubus, CONFIG_UART_LOG_LEVEL);
 
+/* The cmd of the service, see <mcubus/mcubus.h> */
+#define UART_MCUBUS_CMD 0x10
+
 #define CHUNK CONFIG_UART_MCUBUS_CHUNK
 
-BUILD_ASSERT(2 + CHUNK <= MCUBUS_MSG_MAX, "a chunk must fit CONFIG_MCUBUS_MSG_MAX");
+BUILD_ASSERT(CHUNK <= MCUBUS_DATA_MAX, "a chunk must fit CONFIG_I2C_MM_MSG_MAX");
 
 /* Blocking uart_poll_out() gives up on a full buffer after this long */
 #define POLL_OUT_TIMEOUT_MS 100
@@ -234,22 +237,19 @@ static const struct device *const uarts[] = {DT_INST_FOREACH_STATUS_OKAY(MU_DEV)
 
 /* ---- receiving: the mcubus service, in the I2C target interrupt -------------- */
 
-/* `req` is source address, bytes; the payload of the response is how many were taken */
-static int mu_receive(const uint8_t *req, size_t len, uint8_t *rsp)
+/* The data is the bytes; the payload of the response is how many were taken */
+static int mu_receive(const struct mcubus_req *req, uint8_t *rsp)
 {
-	if (len < 1) {
-		return -EINVAL;
-	}
 	for (size_t i = 0; i < ARRAY_SIZE(uarts); i++) {
 		const struct mu_config *cfg = uarts[i]->config;
 		struct mu_data *d = uarts[i]->data;
 		uint32_t n;
 
-		if (cfg->peer != req[0]) {
+		if (cfg->peer != req->src) {
 			continue;
 		}
 		K_SPINLOCK(&d->lock) {
-			n = ring_buf_put(&d->rx, &req[1], len - 1);
+			n = ring_buf_put(&d->rx, req->data, req->len);
 		}
 		if (n > 0) {
 			k_sem_give(&kick);
@@ -260,7 +260,7 @@ static int mu_receive(const uint8_t *req, size_t len, uint8_t *rsp)
 	return -ENODEV; /* no UART for that MCU */
 }
 
-MCUBUS_SERVICE_DEFINE(uart_mcubus_service, MCUBUS_CMD_UART, mu_receive);
+MCUBUS_SERVICE_DEFINE(uart_mcubus_service, UART_MCUBUS_CMD, mu_receive);
 
 /* ---- sending ------------------------------------------------------------------- */
 
@@ -269,20 +269,19 @@ static int mu_send(const struct device *dev)
 {
 	const struct mu_config *cfg = dev->config;
 	struct mu_data *d = dev->data;
-	uint8_t frame[1 + CHUNK];
+	uint8_t chunk[CHUNK];
 	uint8_t taken = 0;
 	uint32_t n;
 	int ret;
 
-	frame[0] = mcubus_addr();
 	K_SPINLOCK(&d->lock) {
-		n = ring_buf_peek(&d->tx, &frame[1], CHUNK);
+		n = ring_buf_peek(&d->tx, chunk, CHUNK);
 	}
 	if (n == 0) {
 		return 0;
 	}
 
-	ret = mcubus_request(cfg->peer, MCUBUS_CMD_UART, frame, 1 + n, &taken, 1);
+	ret = mcubus_request(cfg->peer, UART_MCUBUS_CMD, chunk, n, &taken, 1);
 	if (ret == -EAGAIN || ret == -EBUSY) {
 		return -EAGAIN;
 	}
