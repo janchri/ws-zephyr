@@ -45,14 +45,10 @@
 #include "../mcubus_nodes.dtsi"
 };
 
-/* The image slots of the stock partitions, as mapped partitions: the img group
- * of MCUmgr finds the running image (slot 0) by the chosen code partition
+/* Slot 0 as a mapped partition: the img group of MCUmgr finds the running image
+ * by the chosen code partition
  */
 &slot0_partition {
-	compatible = "zephyr,mapped-partition";
-};
-
-&slot1_partition {
 	compatible = "zephyr,mapped-partition";
 };
 

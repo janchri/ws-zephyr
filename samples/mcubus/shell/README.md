@@ -42,7 +42,7 @@ The first boot formats the storage partition. littlefs is the west project `litt
 
 ### Files and firmware from the laptop: MCUmgr
 
-The boards speak MCUmgr's SMP protocol on the same PTY as their shell (`CONFIG_MCUMGR_TRANSPORT_SHELL`): the shell passes SMP frames on to MCUmgr, and the gateway carries them like any other byte. Two groups: **fs** (upload and download files on `/lfs`) and **img** (upload a firmware image into slot 1). Any SMP client on the laptop works; `smpmgr` is the command line tool on top of `smpclient`, which the twister test uses (`uv tool install smpmgr==0.19.1`, or `pip install smpmgr==0.19.1`). With the PTY of board a that `scripts/run.sh` prints:
+The boards speak MCUmgr's SMP protocol on the same PTY as their shell (`CONFIG_MCUMGR_TRANSPORT_SHELL`): the shell passes SMP frames on to MCUmgr, and the gateway carries them like any other byte. Two groups: **fs** (upload and download files on `/lfs`) and **img** (upload a firmware image into slot 1). Any SMP client on the laptop works; `smpmgr` is the command line tool on top of `smpclient`, which the twister test uses (`uv tool install smpmgr==0.19.1`). With the PTY of board a that `scripts/run.sh` prints:
 
 ```
 smpmgr --port /dev/pts/7 file upload notes.txt /lfs/notes.txt
@@ -77,7 +77,7 @@ Open one with `tio`, `picocom` or `screen`, and press Enter for a prompt (a boar
 west twister -p native_sim -T ws-zephyr/samples/mcubus/shell
 ```
 
-Twister builds the four MCUs and starts the gateway; `pytest/test_shell.py` starts the boards (`required_applications`), opens the PTY of each, and runs in its shell: `mcubus ping` and `mcubus get` of the next board, `mcubus set` of a read-only setting (-13, `-EACCES`), a file written, listed and read back on `/lfs`, and `help`, whose output is many chunks in a row. `test_smp` then uses MCUmgr on board a's PTY (`smpclient`): a file uploaded to `/lfs` and downloaded again, and an image (`imgtool create`) uploaded and found in slot 1 with its version and hash. Every board runs in its build folder, so its flash is the `flash.bin` there. The Python packages are in `ws-zephyr/requirements.txt`.
+Twister builds the four MCUs and starts the gateway; `pytest/test_shell.py` starts the boards (`required_applications`), opens the PTY of each, and runs in its shell: `mcubus ping` and `mcubus get` of the next board, `mcubus set` of a read-only setting (-13, `-EACCES`), a file written, listed and read back on `/lfs`, and `help`, whose output is many chunks in a row. `test_smp` then uses MCUmgr on board a's PTY: a file to `/lfs` and back, an image into slot 1. Every board runs in its build folder, so its flash is the `flash.bin` there. The Python packages are in `ws-zephyr/requirements.txt`.
 
 ## The gateway on a Raspberry Pi Pico
 

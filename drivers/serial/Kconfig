@@ -46,3 +46,12 @@ config UART_MCUBUS_THREAD_STACK_SIZE
 	default 1536
 
 endif # UART_MCUBUS
+
+# A shell on this UART uses its interrupt-driven API, which also hands SMP frames
+# to MCUmgr's shell transport; Zephyr's default is polling wherever the native
+# PTY driver is built (native_sim), whatever UART the shell is on
+DT_CHOSEN_SHELL_UART := zephyr,shell-uart
+DT_COMPAT_MCUBUS_UART := zephyr,mcubus-uart
+
+configdefault SHELL_BACKEND_SERIAL_INTERRUPT_DRIVEN
+	default y if UART_MCUBUS && $(dt_chosen_has_compat,$(DT_CHOSEN_SHELL_UART),$(DT_COMPAT_MCUBUS_UART))

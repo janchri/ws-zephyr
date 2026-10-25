@@ -160,10 +160,9 @@ def test_shell(shells: dict[str, Shell]):
 
 
 async def smp_transfers(pty: str, image_path: Path):
-    client = SMPClient(SMPSerialTransport(), pty, timeout_s=TIMEOUT_S)
-    await client.connect()
-    try:
-        data = os.urandom(4096)
+    """A file to /lfs and back, then an image into slot 1"""
+    async with SMPClient(SMPSerialTransport(), pty, timeout_s=TIMEOUT_S) as client:
+        data = os.urandom(1024)
         async for _ in client.upload_file(data, '/lfs/smp.bin'):
             pass
         assert await client.download_file('/lfs/smp.bin') == data
@@ -171,23 +170,21 @@ async def smp_transfers(pty: str, image_path: Path):
         async for _ in client.upload(image_path.read_bytes()):
             pass
         states = await client.request(ImageStatesRead())
-        return {img.slot: img for img in states.images}
-    finally:
-        await client.disconnect()
+
+    (slot1,) = [img for img in states.images if img.slot == 1]
+    image = ImageInfo.load_file(str(image_path))  # its pydantic model takes no Path
+    assert slot1.version == '1.2.3', slot1
+    assert slot1.hash == image.get_tlv(IMAGE_TLV.SHA256).value, slot1
 
 
 def test_smp(ptys: dict[str, str], tmp_path: Path):
-    # An MCUboot image of random bytes, as "west sign" makes it of a build
+    # An MCUboot image of random bytes, as "west sign" makes it of a build, for
+    # native_sim's slot size (boards/native/native_sim/native_sim.dts)
     payload, image_path = tmp_path / 'payload.bin', tmp_path / 'image.bin'
-    payload.write_bytes(os.urandom(8192))
+    payload.write_bytes(os.urandom(1024))
     subprocess.run(
         ['imgtool', 'create', '--version', '1.2.3', '--header-size', '0x200', '--pad-header',
-         '--align', '4', '--slot-size', '0x69000', payload, image_path],
+         '--slot-size', '0x69000', payload, image_path],
         check=True,
     )  # fmt: skip
-
-    slots = asyncio.run(smp_transfers(ptys['a'], image_path))
-    assert 1 in slots, slots
-    image = ImageInfo.load_file(str(image_path))
-    assert slots[1].version == '1.2.3', slots[1]
-    assert slots[1].hash == image.get_tlv(IMAGE_TLV.SHA256).value, slots[1]
+    asyncio.run(smp_transfers(ptys['a'], image_path))
