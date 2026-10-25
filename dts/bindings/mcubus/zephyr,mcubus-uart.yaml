@@ -1,0 +1,26 @@
+# Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  A UART over the multi-master I2C bus (CONFIG_MCUBUS): a byte stream between
+  this MCU and one other MCU on the bus, `peer`. What this MCU writes goes to
+  the peer; what the peer writes to its UART for this MCU can be read here.
+
+  A board points zephyr,shell-uart (or zephyr,console) at one of these, with
+  the console gateway as its peer. The gateway has one per board, each
+  bridged to a UART of its own (zephyr,uart-bridge).
+
+    bus_uart: bus-uart {
+            compatible = "zephyr,mcubus-uart";
+            peer = <&gw>;
+    };
+
+compatible: "zephyr,mcubus-uart"
+
+include: base.yaml
+
+properties:
+  peer:
+    type: phandle
+    required: true
+    description: The zephyr,mcubus-node node of the MCU at the other end

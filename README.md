@@ -6,7 +6,7 @@ This guide provides step-by-step instructions to initialize and configure a Zeph
 
 - Ensure you have `dependencies` installed. Refer to [Zephyr Project documentation](https://docs.zephyrproject.org/latest/develop/getting_started/index.html).
 - Python and `pip` must be installed on your system.
-- A compatible shell environment (e.g., Bash). 
+- A compatible shell environment (e.g., Bash).
 
 ## Setup Instructions
 
@@ -96,6 +96,25 @@ This guide provides step-by-step instructions to initialize and configure a Zeph
    ```bash
    west build -b esp32_devkitc/esp32/procpu zephyr/samples/basic/minimal/ -p auto
    ```
+
+## What is in the module
+
+- **mcubus**: equal MCUs on one multi-master I2C bus, with settings and a UART (shell, console) between them, and an emulated bus for native_sim. See [doc/mcubus.md](doc/mcubus.md); samples in `samples/mcubus/`, tests in `tests/subsys/mcubus/`.
+
+   ```bash
+   west twister -p native_sim -T ws-zephyr/samples -T ws-zephyr/tests
+   ```
+
+## Coding style
+
+C follows Zephyr's `.clang-format`, Python Zephyr's ruff rules (`.ruff.toml`). A pre-commit hook checks the files of every commit. Its hooks are local: they run the tools of `requirements.txt` (the clang-format and ruff versions of Zephyr's CI) from the active venv, so nothing is downloaded. Install them and the hook once per clone:
+
+```bash
+pip install -r ws-zephyr/requirements.txt
+cd ws-zephyr && pre-commit install
+```
+
+`pre-commit run --all-files` runs the checks by hand. The hook fixes whitespace and formatting itself; add the fixed files and commit again.
 
 ## Troubleshooting
 

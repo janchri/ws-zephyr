@@ -56,3 +56,6 @@ dkms.conf
 
 # build folders
 build
+
+# Python bytecode caches (pytest runs)
+__pycache__/

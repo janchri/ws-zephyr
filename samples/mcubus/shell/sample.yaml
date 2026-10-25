@@ -1,0 +1,41 @@
+# Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: Shells over the mcubus
+common:
+  tags:
+    - i2c
+    - shell
+tests:
+  # The gateway, started by twister; pytest/test_shell.py starts the
+  # boards a, b and c next to it, from the builds below, on the same virtual bus
+  sample.mcubus.shell:
+    platform_allow: native_sim
+    integration_platforms:
+      - native_sim
+    extra_args: NODE=gw
+    harness: pytest
+    required_applications:
+      - name: sample.mcubus.shell.node_a
+      - name: sample.mcubus.shell.node_b
+      - name: sample.mcubus.shell.node_c
+  sample.mcubus.shell.node_a:
+    platform_allow: native_sim
+    extra_args: NODE=a
+    build_only: true
+  sample.mcubus.shell.node_b:
+    platform_allow: native_sim
+    extra_args: NODE=b
+    build_only: true
+  sample.mcubus.shell.node_c:
+    platform_allow: native_sim
+    extra_args: NODE=c
+    build_only: true
+  # The gateway on a Raspberry Pi Pico, on real I2C
+  sample.mcubus.shell.gateway_hw:
+    platform_allow: rpi_pico
+    integration_platforms:
+      - rpi_pico
+    extra_args: NODE=gw
+    build_only: true

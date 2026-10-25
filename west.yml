@@ -30,9 +30,11 @@ manifest:
         - cmsis_6
         - fatfs
         - hal_espressif
-        - mbedtls
-        - segger
         - hal_st
         - hal_stm32
         - hal_nordic
+        - hal_rpi_pico
+        - littlefs
+        - mbedtls
+        - segger
         - tf-psa-crypto

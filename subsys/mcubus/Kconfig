@@ -1,0 +1,80 @@
+# Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+DT_CHOSEN_MCUBUS_SELF := zephyr,mcubus-self
+
+menuconfig MCUBUS
+	bool "Requests between the MCUs on a multi-master I2C bus"
+	default y if $(dt_chosen_enabled,$(DT_CHOSEN_MCUBUS_SELF))
+	depends on I2C
+	select I2C_TARGET
+	help
+	  This MCU (/chosen zephyr,mcubus-self) serves requests of the other
+	  MCUs as an I2C target, from boot on, and sends them requests as a
+	  controller. Services: settings (MCUBUS_SETTINGS) and a UART
+	  (UART_MCUBUS). See <mcubus/mcubus.h>.
+
+if MCUBUS
+
+config MCUBUS_MSG_MAX
+	int "Longest request or response"
+	default 64
+	range 8 255
+	help
+	  In bytes, the cmd of a request and the status of a response
+	  included. Every MCU on the bus needs the same value.
+
+config MCUBUS_RETRY_MS
+	int "How long a request is retried after lost arbitration or a busy bus"
+	default 500
+	help
+	  The lowest frame always wins the arbitration: a request with a high
+	  frame can wait behind every other transfer of a busy bus.
+
+config MCUBUS_INIT_PRIORITY
+	int "Init priority, after the I2C driver"
+	default 60
+
+config MCUBUS_TARGET_REREGISTER
+	bool "Register the target again after every transfer"
+	default y if DT_HAS_SNPS_DESIGNWARE_I2C_ENABLED
+	help
+	  For I2C drivers that switch the block to controller mode for a transfer
+	  and do not switch back to target mode afterwards, such as Zephyr's
+	  DesignWare driver (Raspberry Pi Pico). Until it is registered again, the
+	  MCU does not answer at its address.
+
+config MCUBUS_SHELL
+	bool "Shell commands: mcubus ping / stats, and get / set of MCUBUS_SETTINGS"
+	default y
+	depends on SHELL
+
+menuconfig MCUBUS_SETTINGS
+	bool "Settings service: get and set the settings of the MCUs by name"
+	depends on SETTINGS
+	select SETTINGS_RUNTIME
+	help
+	  Every MCU serves its own settings, and gets and sets those of the
+	  others. See <mcubus/settings.h>.
+
+if MCUBUS_SETTINGS
+
+config MCUBUS_SETTINGS_KEY_MAX
+	int "Longest key, with the terminating NUL"
+	default 24
+	range 2 128
+
+config MCUBUS_SETTINGS_VALUE_MAX
+	int "Longest value"
+	default 16
+	range 1 125
+	help
+	  A SET (cmd, key, value) must fit MCUBUS_MSG_MAX.
+
+endif # MCUBUS_SETTINGS
+
+module = MCUBUS
+module-str = mcubus
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # MCUBUS

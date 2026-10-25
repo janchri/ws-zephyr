@@ -1,13 +1,10 @@
 # WirbelWind
 
-Zephyr port of [MusicBox_ESP32a1s](https://github.com/janchri/MusicBox_ESP32a1s),
-a Toniebox-like music box: place a tag, its playlist plays from where it
-stopped last time; remove the tag and playback pauses.
+Zephyr port of [MusicBox_ESP32a1s](https://github.com/janchri/MusicBox_ESP32a1s), a Toniebox-like music box: place a tag, its playlist plays from where it stopped last time; remove the tag and playback pauses.
 
 ## Architecture
 
-Every module has its own header with just its interface. Code that only exists
-for a platform lives in its own folder (`src/native/`, `src/esp32a1s/`).
+Every module has its own header with just its interface. Code that only exists for a platform lives in its own folder (`src/native/`, `src/esp32a1s/`).
 
 | Module                       | Job                                                        | Arduino original |
 |------------------------------|------------------------------------------------------------|------------------|
@@ -33,20 +30,14 @@ for a platform lives in its own folder (`src/native/`, `src/esp32a1s/`).
 | `esp32a1s/audio.c`           | ESP32-A1S audio output: I2S0 + MCLK on GPIO0               | `AudioOutputI2S` |
 | `esp32a1s/ac101.c/.h`        | AC101 codec over I2C (`dts/bindings/x-powers,ac101.yaml`)  | `AC101` library  |
 
-Dependencies point one way: the UIs (`shell`, `http`) and `inputs` post events
-or call the controller; the controller uses `player`, `playlist` and `resume`;
-the player uses `audio` and `storage`.
+Dependencies point one way: the UIs (`shell`, `http`) and `inputs` post events or call the controller; the controller uses `player`, `playlist` and `resume`; the player uses `audio` and `storage`.
 
-Playlists: `/Music/.config/playlist_<uid>` with
-`{"uuid":"<uid>","name":"...","tracks":["/Music/...mp3", ...]}`.
-An unknown tag gets an empty playlist automatically.
+Playlists: `/Music/.config/playlist_<uid>` with `{"uuid":"<uid>","name":"...","tracks":["/Music/...mp3", ...]}`. An unknown tag gets an empty playlist automatically.
 
 Controls:
 
-- **Tag**: placed = play (from where it stopped), removed = pause. The box has no
-  play/pause button (the web UI has one per track).
-- **Button**: short press = next track; ≥1 s = restart the playlist from the
-  first track; ≥10 s = forget the positions of all playlists.
+- **Tag**: placed = play (from where it stopped), removed = pause. The box has no play/pause button (the web UI has one per track).
+- **Button**: short press = next track; ≥1 s = restart the playlist from the first track; ≥10 s = forget the positions of all playlists.
 - **Potentiometer** (analog input via `analog-axis`): volume 0..20.
 
 ## native_sim
@@ -65,21 +56,13 @@ build-native/zephyr/zephyr.exe -uart_stdinout --sdcard=sdcard.img --flash=flash.
     --audio_cmd="aplay -q -f S16_LE -r {rate} -c {ch}"
 ```
 
-In the web UI every track has a play button (start it from the beginning: now,
-or when its tag is placed next time); the track playing right now has a pause
-button instead. Pausing from the web is the only pause besides removing the tag.
+In the web UI every track has a play button (start it from the beginning: now, or when its tag is placed next time); the track playing right now has a pause button instead. Pausing from the web is the only pause besides removing the tag.
 
-The volume starts at 0 like a pot turned fully down: run `ww pot 50` to hear
-something.
+The volume starts at 0 like a pot turned fully down: run `ww pot 50` to hear something.
 
-Web interface: http://localhost:8080 (native_sim uses the host's sockets; port 80
-on hardware). `#pl=<uid>` in the URL opens a playlist directly.
+Web interface: http://localhost:8080 (native_sim uses the host's sockets; port 80 on hardware). `#pl=<uid>` in the URL opens a playlist directly.
 
-`--audio_file=out.raw` writes the raw PCM instead; without either option the
-audio is discarded. The music lives in `sdcard.img`; `flash.bin` is the internal
-flash holding only the saved positions, it is created on the first start.
-Use ASCII file names (FatFs runs with code page 850, not UTF-8); the web upload
-converts names automatically (ä → ae, ß → ss, ...).
+`--audio_file=out.raw` writes the raw PCM instead; without either option the audio is discarded. The music lives in `sdcard.img`; `flash.bin` is the internal flash holding only the saved positions, it is created on the first start. Use ASCII file names (FatFs runs with code page 850, not UTF-8); the web upload converts names automatically (ä → ae, ß → ss, ...).
 
 ```
 uart:~$ ww tag place 0a1b2c3d     # card on the emulated reader: 4, 7 or 10 byte UID
@@ -96,8 +79,7 @@ uart:~$ ww next | reset | reset_all | vol [n] | seek <s> | track <nr> | ls [path
 
 ## ESP32-A1S Audio Kit (AC101)
 
-Ai-Thinker ESP32 Audio Kit v2.2 with the AC101 codec, built on top of the
-`esp32_devkitc` board (`boards/esp32_devkitc_procpu.overlay` has the pins).
+Ai-Thinker ESP32 Audio Kit v2.2 with the AC101 codec, built on top of the `esp32_devkitc` board (`boards/esp32_devkitc_procpu.overlay` has the pins).
 
 ```sh
 west build -b esp32_devkitc/esp32/procpu -d build-esp32 ws-zephyr/applications/wirbelwind
@@ -105,29 +87,12 @@ west flash -d build-esp32
 west espressif monitor          # or: picocom -b 115200 /dev/ttyUSB0
 ```
 
-- Audio: I2S0 master (BCLK 27, LRCK 26, DOUT 25) → AC101 (I2C 33/32), MCLK on
-  GPIO0, speaker amplifier enable on GPIO21. The output always runs at 44.1 kHz
-  stereo; other rates and mono are converted (`resample.c`).
-  `CONFIG_WW_AC101_HP_VOLUME` / `CONFIG_WW_AC101_SPK_VOLUME` set the analog
-  levels, the pot/`ww vol` scales on top of that.
-- SD card: 4 bit SDMMC, FAT. The `sdcard.img` from `mk_sdcard.sh` can be
-  written to a card (`dd`), or copy music to a FAT32 card and create the
-  playlists with `ww pl create/add`.
-- Button on GPIO22, volume pot on GPIO34 (ADC1 ch 6, **placeholder**: adjust to
-  the wiring). An unconnected pot input floats; use `ww vol` then.
-- RFID: MFRC522 on VSPI (SCK 18, MISO 19, MOSI 23, CS 5), 4 MHz, no reset
-  pin. Polled every 250 ms; a card counts as removed after 3 polls without
-  it. UIDs are lower case hex like before (`a1b2c3d4`, 7 and 10 byte UIDs too).
-  `ww tag place <uid>` posts tag events directly, without a card.
-- WiFi: if no tag is on the box 3 s after power-on, it opens the hotspot
-  `music.Box` (like the Arduino version) and the web interface is at
-  http://192.168.4.1 (DHCP for the phone/laptop). With a tag on the box at
-  power-on there is no hotspot. Once open it stays until the next restart.
-  The hotspot is **open** by default, like before: anyone nearby can use the
-  web interface. Set `CONFIG_WW_WIFI_AP_PSK` (8..63 characters) for WPA2.
-  Name, address and the waiting time: `CONFIG_WW_WIFI_AP_SSID`, `_IP`, `_DELAY_MS`.
-- Memory: the WiFi driver keeps its heap in the 8 MB PSRAM of the A1S module
-  (`CONFIG_ESP_SPIRAM`), internal RAM is too small for audio + WiFi + web.
+- Audio: I2S0 master (BCLK 27, LRCK 26, DOUT 25) → AC101 (I2C 33/32), MCLK on GPIO0, speaker amplifier enable on GPIO21. The output always runs at 44.1 kHz stereo; other rates and mono are converted (`resample.c`). `CONFIG_WW_AC101_HP_VOLUME` / `CONFIG_WW_AC101_SPK_VOLUME` set the analog levels, the pot/`ww vol` scales on top of that.
+- SD card: 4 bit SDMMC, FAT. The `sdcard.img` from `mk_sdcard.sh` can be written to a card (`dd`), or copy music to a FAT32 card and create the playlists with `ww pl create/add`.
+- Button on GPIO22, volume pot on GPIO34 (ADC1 ch 6, **placeholder**: adjust to the wiring). An unconnected pot input floats; use `ww vol` then.
+- RFID: MFRC522 on VSPI (SCK 18, MISO 19, MOSI 23, CS 5), 4 MHz, no reset pin. Polled every 250 ms; a card counts as removed after 3 polls without it. UIDs are lower case hex like before (`a1b2c3d4`, 7 and 10 byte UIDs too). `ww tag place <uid>` posts tag events directly, without a card.
+- WiFi: if no tag is on the box 3 s after power-on, it opens the hotspot `music.Box` (like the Arduino version) and the web interface is at http://192.168.4.1 (DHCP for the phone/laptop). With a tag on the box at power-on there is no hotspot. Once open it stays until the next restart. The hotspot is **open** by default, like before: anyone nearby can use the web interface. Set `CONFIG_WW_WIFI_AP_PSK` (8..63 characters) for WPA2. Name, address and the waiting time: `CONFIG_WW_WIFI_AP_SSID`, `_IP`, `_DELAY_MS`.
+- Memory: the WiFi driver keeps its heap in the 8 MB PSRAM of the A1S module (`CONFIG_ESP_SPIRAM`), internal RAM is too small for audio + WiFi + web.
 
 ## REST API
 
