@@ -11,13 +11,13 @@ from pathlib import Path
 from twister_harness import DeviceAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'scripts' / 'pylib'))
-from twixt_bench import TIMEOUT_S, start_nodes  # noqa: E402
+from twixt_bench import TIMEOUT_S, start_mcus  # noqa: E402
 
 BUS_ID = 2  # boards/native_sim.overlay
 
 
 def test_hello(required_build_dirs: list[str], unlaunched_dut: DeviceAdapter):
-    with start_nodes(required_build_dirs, BUS_ID) as (b,):
+    with start_mcus(required_build_dirs, BUS_ID) as (b,):
         unlaunched_dut.launch()
         unlaunched_dut.readlines_until(
             regex=r'0x11 echoed "hello from mcu-a@10", from 0x10', timeout=TIMEOUT_S

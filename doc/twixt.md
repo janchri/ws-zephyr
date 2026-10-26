@@ -54,7 +54,7 @@ The MCUs are children of the bus node, the same in every image; `/chosen twixt,s
 | `tests/subsys/twixt/api` | One MCU: services, faults |
 | `tests/subsys/twixt/stress` | Three MCUs sending at the same moments |
 
-`scripts/twixt_run.sh <sample> <mcus>` runs the MCUs of a sample on native_sim, one process each.
+`scripts/twixt_run.sh <sample> <mcus>` runs the MCUs of a sample on native_sim, one process each. With `GDB=<mcu>`, that MCU waits for a debugger on `gdbserver :2345`; attach with `gdb <build-dir>/gdb.exe -ex 'target remote :2345'` or an IDE.
 
 ## On hardware
 

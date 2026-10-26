@@ -1,0 +1,47 @@
+{
+    // Verwendet IntelliSense zum Ermitteln möglicher Attribute.
+    // Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
+    // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python-Debugger: Aktuelle Datei",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Attach: West Debugserver",
+            "type": "cortex-debug",
+            "request": "attach",
+            "servertype": "external",
+            "gdbTarget": "localhost:61234",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceFolder}/build/zephyr/zephyr.elf",
+            "gdbPath": "/home/christoph/zephyr-sdk-1.0.0/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "runToEntryPoint": "main",
+        },
+        {
+            "name": "native_sim: attach twixt gdbserver",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/${input:twixtBuildDir}/gdb.exe",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerServerAddress": "localhost:2345",
+            "setupCommands": [
+                { "text": "-enable-pretty-printing", "ignoreFailures": true }
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "twixtBuildDir",
+            "type": "promptString",
+            "description": "BUILD_DIR of twixt_run.sh (GDB=<mcu>)",
+            "default": "build-twixt-hello"
+        }
+    ]
+}

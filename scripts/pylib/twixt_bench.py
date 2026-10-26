@@ -5,10 +5,10 @@
 # MCU is a native_sim process, and the processes with the same bus-id share one
 # virtual I2C bus (twixt,native-i2c-mm). Twister builds every MCU
 # (required_applications) and starts one of them as the DUT; a test starts the
-# others with start_nodes(), and reads their logs or the gateway's PTYs.
+# others with start_mcus(), and reads their logs or the gateway's PTYs.
 #
 #   sys.path.insert(0, str(<ws-zephyr> / 'scripts' / 'pylib'))
-#   from twixt_bench import Node, Shell, start_nodes
+#   from twixt_bench import Mcu, Shell, start_mcus
 
 import os
 import re
@@ -38,13 +38,13 @@ def bus_users(bus_id: int) -> list[int]:
     return pids
 
 
-class Node:
+class Mcu:
     """An MCU besides the DUT: its own process in its build folder, so its flash is
-    the flash.bin there, and its log is node.log"""
+    the flash.bin there, and its log is mcu.log"""
 
     def __init__(self, build_dir: Path, args: list[str] = ()):
         self.name = build_dir.name
-        self.log = build_dir / 'node.log'
+        self.log = build_dir / 'mcu.log'
         with self.log.open('w') as out:
             self.proc = subprocess.Popen(
                 [build_dir / 'zephyr' / 'zephyr.exe', *args],
@@ -74,19 +74,19 @@ class Node:
 
 
 @contextmanager
-def start_nodes(build_dirs: list[str], bus_id: int, args=lambda i: []) -> Iterator[list[Node]]:
+def start_mcus(build_dirs: list[str], bus_id: int, args=lambda i: []) -> Iterator[list[Mcu]]:
     """Start the MCUs of `build_dirs` (sorted), the i-th with args(i); stop them after"""
     users = bus_users(bus_id)
     assert not users, f'processes left over on bus {bus_id}, kill them first: {users}'
 
-    nodes = []
+    mcus = []
     try:
         for i, build_dir in enumerate(sorted(build_dirs)):
-            nodes.append(Node(Path(build_dir), args(i)))
-        yield nodes
+            mcus.append(Mcu(Path(build_dir), args(i)))
+        yield mcus
     finally:
-        for node in nodes:
-            node.stop()
+        for mcu in mcus:
+            mcu.stop()
 
 
 PTY = re.compile(r'pty-(\w+) connected to pseudotty: (\S+)')
@@ -102,7 +102,7 @@ def gateway_ptys(
     dut, build_dirs: list[str], bus_id: int, boards: list[str]
 ) -> Iterator[dict[str, str]]:
     """Start the boards, launch the gateway (the DUT), and yield its PTY of every board"""
-    with start_nodes(build_dirs, bus_id):
+    with start_mcus(build_dirs, bus_id):
         dut.launch()
         lines = dut.readlines_until(regex=rf'pty-{boards[-1]} connected', timeout=TIMEOUT_S)
         paths = ptys(lines)
@@ -112,7 +112,7 @@ def gateway_ptys(
 
 @contextmanager
 def board_shells(paths: dict[str, str], boards: dict[str, int]) -> Iterator[dict[str, 'Shell']]:
-    """The shell of every board, its prompt being its node name: mcu-a@10:~$"""
+    """The shell of every board, its prompt being its MCU name: mcu-a@10:~$"""
     opened = {n: Shell(paths[n], f'mcu-{n}@{addr:x}:~$ ') for n, addr in boards.items()}
     try:
         yield opened

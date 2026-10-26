@@ -14,7 +14,7 @@ import pytest
 from twister_harness import DeviceAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[5] / 'scripts' / 'pylib'))
-from twixt_bench import start_nodes  # noqa: E402
+from twixt_bench import start_mcus  # noqa: E402
 
 BUS_ID = 4  # boards/native_sim.overlay
 VERDICT = r'all settings verified|settings check failed'
@@ -24,7 +24,7 @@ TIMEOUT_S = 30
 
 def test_stress(required_build_dirs: list[str], unlaunched_dut: DeviceAdapter):
     # every MCU its own seed, for its own random choices
-    with start_nodes(required_build_dirs, BUS_ID, lambda i: [f'--seed={2 + i}']) as peers:
+    with start_mcus(required_build_dirs, BUS_ID, lambda i: [f'--seed={2 + i}']) as peers:
         unlaunched_dut.launch()  # after the peers: all three join the bus within ~1 s anyway
 
         # the statistics come just before the verdict

@@ -35,6 +35,6 @@ smpmgr warns that reading the MCUmgr parameters failed: the boards have no os gr
 
 Twister: `west twister -p native_sim -T ws-zephyr/applications/twixt-system`
 
-The gateway also builds for the Raspberry Pi Pico (`-b rpi_pico -DNODE=gw`), see `samples/twixt/uart`.
+The gateway also builds for the Raspberry Pi Pico (`-b rpi_pico -DMCU=gw`), see `samples/twixt/uart`.
 
 The west projects `littlefs`, `mcuboot` and `zcbor` are needed.

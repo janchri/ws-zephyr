@@ -6,7 +6,7 @@
 
 /* The gateway on a Raspberry Pi Pico: the bus on I2C0, SDA GP4 (pin 6) and SCL
  * GP5 (pin 7); the boards are USB CDC-ACM ports on the laptop, /dev/ttyACM*.
- * The Pico is only the gateway (-DNODE=gw).
+ * The Pico is only the gateway (-DMCU=gw).
  */
 
 / {
@@ -18,7 +18,7 @@
 &i2c0 {
 	clock-frequency = <I2C_BITRATE_STANDARD>;
 
-#include "../twixt_nodes.dtsi"
+#include "../twixt_mcus.dtsi"
 };
 
 &pinctrl {

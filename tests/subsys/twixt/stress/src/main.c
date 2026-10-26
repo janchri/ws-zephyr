@@ -26,7 +26,7 @@
  *
  * The MCUs on the bus and their I2C addresses are devicetree
  * (boards/native_sim.overlay, compatible "twixt,mcu"); the one this
- * image runs on is /chosen twixt,self, picked by -DNODE=<a|b|c>.
+ * image runs on is /chosen twixt,self, picked by -DMCU=<a|b|c>.
  */
 
 #include <stdio.h>

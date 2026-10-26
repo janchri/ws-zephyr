@@ -3,9 +3,9 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-# One image per MCU: NODE picks the node of boards/native_sim.overlay this image is
-set(NODE a CACHE STRING "MCU to build: a, b or c")
-list(APPEND DTS_EXTRA_CPPFLAGS -DTWIXT_SELF_LABEL=mcu_${NODE})
+# One image per MCU: MCU picks which MCU of boards/native_sim.overlay this image is
+set(MCU a CACHE STRING "MCU to build: a, b or c")
+list(APPEND DTS_EXTRA_CPPFLAGS -DTWIXT_SELF_LABEL=mcu_${MCU})
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(twixt_stress)

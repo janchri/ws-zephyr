@@ -14,28 +14,28 @@ tests:
     platform_allow: native_sim
     integration_platforms:
       - native_sim
-    extra_args: NODE=gw
+    extra_args: MCU=gw
     harness: pytest
     required_applications:
-      - name: sample.twixt.uart.node_a
-      - name: sample.twixt.uart.node_b
-      - name: sample.twixt.uart.node_c
-  sample.twixt.uart.node_a:
+      - name: sample.twixt.uart.mcu_a
+      - name: sample.twixt.uart.mcu_b
+      - name: sample.twixt.uart.mcu_c
+  sample.twixt.uart.mcu_a:
     platform_allow: native_sim
-    extra_args: NODE=a
+    extra_args: MCU=a
     build_only: true
-  sample.twixt.uart.node_b:
+  sample.twixt.uart.mcu_b:
     platform_allow: native_sim
-    extra_args: NODE=b
+    extra_args: MCU=b
     build_only: true
-  sample.twixt.uart.node_c:
+  sample.twixt.uart.mcu_c:
     platform_allow: native_sim
-    extra_args: NODE=c
+    extra_args: MCU=c
     build_only: true
   # The gateway on a Raspberry Pi Pico, on real I2C
   sample.twixt.uart.gateway_hw:
     platform_allow: rpi_pico
     integration_platforms:
       - rpi_pico
-    extra_args: NODE=gw
+    extra_args: MCU=gw
     build_only: true

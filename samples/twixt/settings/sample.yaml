@@ -14,10 +14,10 @@ common:
 tests:
   # MCU a, started by twister; pytest/test_settings.py starts b next to it
   sample.twixt.settings:
-    extra_args: NODE=a
+    extra_args: MCU=a
     harness: pytest
     required_applications:
-      - name: sample.twixt.settings.node_b
-  sample.twixt.settings.node_b:
-    extra_args: NODE=b
+      - name: sample.twixt.settings.mcu_b
+  sample.twixt.settings.mcu_b:
+    extra_args: MCU=b
     build_only: true

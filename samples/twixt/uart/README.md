@@ -26,7 +26,7 @@ Twister: `west twister -p native_sim -T ws-zephyr/samples/twixt/uart`
 ## Gateway on a Raspberry Pi Pico
 
 ```
-west build -b rpi_pico -d build-gw ws-zephyr/samples/twixt/uart -- -DNODE=gw
+west build -b rpi_pico -d build-gw ws-zephyr/samples/twixt/uart -- -DMCU=gw
 ```
 
 Copy `build-gw/zephyr/zephyr.uf2` to the Pico in BOOTSEL mode. The bus is I2C0: SDA GP4, SCL GP5, with 4.7 kΩ pull-ups to 3.3 V. Each board is a USB CDC-ACM port, `/dev/serial/by-id/usb-twixt_twixt_console_gateway-if00` (a), `-if02` (b), `-if04` (c).

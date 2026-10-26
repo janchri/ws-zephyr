@@ -15,10 +15,10 @@ tests:
   # The gateway, started by twister; pytest/test_smp.py starts the board next
   # to it and talks SMP to it through the gateway's PTY
   sample.twixt.smp:
-    extra_args: NODE=gw
+    extra_args: MCU=gw
     harness: pytest
     required_applications:
-      - name: sample.twixt.smp.node_a
-  sample.twixt.smp.node_a:
-    extra_args: NODE=a
+      - name: sample.twixt.smp.mcu_a
+  sample.twixt.smp.mcu_a:
+    extra_args: MCU=a
     build_only: true

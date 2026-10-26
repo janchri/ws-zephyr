@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* The bus on native_sim (twixt,native-i2c-mm); TWIXT_SELF_LABEL is mcu_<NODE> */
+/* The bus on native_sim (twixt,native-i2c-mm); TWIXT_SELF_LABEL is mcu_<MCU> */
 
 / {
 	chosen {
@@ -38,7 +38,7 @@
 	bus-id = <5>;
 	start-window-us = <2000>;
 
-#include "../twixt_nodes.dtsi"
+#include "../twixt_mcus.dtsi"
 };
 
 /* Slot 0 as a mapped partition: the img group of MCUmgr finds the running image
