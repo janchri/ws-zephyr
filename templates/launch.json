@@ -23,14 +23,14 @@
             "runToEntryPoint": "main",
         },
         {
-            "name": "native_sim: attach twixt gdbserver",
+            "name": "twixt gdbserver",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/${input:twixtBuildDir}/gdb.exe",
+            "program": "/tmp/twixt-gdb-${input:twixtPort}.exe",
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
-            "miDebuggerServerAddress": "localhost:2345",
+            "miDebuggerServerAddress": "localhost:${input:twixtPort}",
             "setupCommands": [
                 { "text": "-enable-pretty-printing", "ignoreFailures": true }
             ]
@@ -38,10 +38,10 @@
     ],
     "inputs": [
         {
-            "id": "twixtBuildDir",
+            "id": "twixtPort",
             "type": "promptString",
-            "description": "BUILD_DIR of twixt_run.sh (GDB=<mcu>)",
-            "default": "build-twixt-hello"
+            "description": "gdbserver port of the MCU (twixt_run.sh: \"[a] Listening on port 2345\")",
+            "default": "2345"
         }
     ]
 }

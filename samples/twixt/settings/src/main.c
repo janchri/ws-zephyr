@@ -117,34 +117,39 @@ int main(void)
 	LOG_INF("%s at 0x%02x, greeting from flash: \"%.*s\"", twixt_self_name(), twixt_self_addr(),
 		(int)greeting_len, greeting);
 
-	ret = twixt_ping_wait(peer, &info, K_SECONDS(5));
-	if (ret) {
-		LOG_ERR("no answer from 0x%02x: %d", peer, ret);
-		return 0;
+	while (true) {
+		k_sleep(K_SECONDS(5));
+
+		ret = twixt_ping_wait(peer, &info, K_SECONDS(1));
+		if (ret) {
+			LOG_ERR("no answer from 0x%02x: %d", peer, ret);
+			continue;
+		}
+
+		len = twixt_settings_get(peer, "mcu/name", val, sizeof(val));
+		if (len < 0) {
+			LOG_ERR("get mcu/name of 0x%02x: %d", peer, len);
+			continue;
+		}
+		LOG_INF("0x%02x is %.*s", peer, MIN(len, (int)sizeof(val)), val);
+
+		len = snprintf(hi, sizeof(hi), "hi from %s", twixt_self_name());
+		ret = twixt_settings_set(peer, "mcu/greeting", hi, MIN(len, (int)sizeof(hi) - 1));
+		if (ret) {
+			LOG_ERR("set mcu/greeting of 0x%02x: %d", peer, ret);
+			continue;
+		}
+
+		len = twixt_settings_get(peer, "mcu/greeting", val, sizeof(val));
+		if (len < 0) {
+			LOG_ERR("get mcu/greeting of 0x%02x: %d", peer, len);
+			continue;
+		}
+		LOG_INF("0x%02x mcu/greeting = \"%.*s\"", peer, MIN(len, (int)sizeof(val)), val);
+
+		ret = twixt_settings_set(peer, "mcu/name", "x", 1);
+		LOG_INF("0x%02x mcu/name is read-only: %d", peer, ret);
 	}
 
-	len = twixt_settings_get(peer, "mcu/name", val, sizeof(val));
-	if (len < 0) {
-		LOG_ERR("get mcu/name of 0x%02x: %d", peer, len);
-		return 0;
-	}
-	LOG_INF("0x%02x is %.*s", peer, MIN(len, (int)sizeof(val)), val);
-
-	len = snprintf(hi, sizeof(hi), "hi from %s", twixt_self_name());
-	ret = twixt_settings_set(peer, "mcu/greeting", hi, MIN(len, (int)sizeof(hi) - 1));
-	if (ret) {
-		LOG_ERR("set mcu/greeting of 0x%02x: %d", peer, ret);
-		return 0;
-	}
-
-	len = twixt_settings_get(peer, "mcu/greeting", val, sizeof(val));
-	if (len < 0) {
-		LOG_ERR("get mcu/greeting of 0x%02x: %d", peer, len);
-		return 0;
-	}
-	LOG_INF("0x%02x mcu/greeting = \"%.*s\"", peer, MIN(len, (int)sizeof(val)), val);
-
-	ret = twixt_settings_set(peer, "mcu/name", "x", 1);
-	LOG_INF("0x%02x mcu/name is read-only: %d", peer, ret);
 	return 0;
 }
