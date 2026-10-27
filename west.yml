@@ -12,6 +12,8 @@ manifest:
   remotes:
     - name: zephyrproject
       url-base: https://github.com/zephyrproject-rtos
+    - name: janchri
+      url-base: https://github.com/janchri
 
   self:
     path: ws-zephyr
@@ -40,3 +42,8 @@ manifest:
         - segger
         - tf-psa-crypto
         - zcbor
+
+  - name: twixt
+    remote: janchri
+    revision: main
+    path: modules/lib/twixt

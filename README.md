@@ -97,12 +97,13 @@ This guide provides step-by-step instructions to initialize and configure a Zeph
    west build -b esp32_devkitc/esp32/procpu zephyr/samples/basic/minimal/ -p auto
    ```
 
-## What is in the module
+## What is in the workspace
 
-- **twixt**: equal MCUs on one multi-master I2C bus, with settings and a UART (shell, console) between them, and a shared-memory bus for native_sim. See [doc/twixt.md](doc/twixt.md); samples in `samples/twixt/` (`hello`, `settings`, `uart`, `smp`), tests in `tests/subsys/twixt/` (`api`, `stress`), and all of it together in `applications/twixt-system/`. `scripts/twixt_run.sh` runs the MCUs of one of them on native_sim.
+- **twixt** ([janchri/twixt](https://github.com/janchri/twixt), in `modules/lib/twixt`): equal MCUs on one multi-master I2C bus, with its samples and tests.
+- **applications/twixt-system**: all of twixt together, as a product: settings in NVS, littlefs, MCUmgr (fs, img), a Pico gateway.
 
    ```bash
-   west twister -p native_sim -T ws-zephyr/samples -T ws-zephyr/tests -T ws-zephyr/applications/twixt-system
+   west twister -p native_sim -T modules/lib/twixt -T ws-zephyr/applications/twixt-system
    ```
 
 ## Coding style

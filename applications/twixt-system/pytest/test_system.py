@@ -23,7 +23,8 @@ from smpclient.requests.image_management import ImageStatesRead
 from smpclient.transport.serial import SMPSerialTransport
 from twister_harness import DeviceAdapter
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts' / 'pylib'))
+TWIXT = Path(__file__).resolve().parents[4] / 'modules' / 'lib' / 'twixt'
+sys.path.insert(0, str(TWIXT / 'scripts' / 'pylib'))
 from twixt_bench import TIMEOUT_S, Shell, board_shells, gateway_ptys  # noqa: E402
 
 BUS_ID = 5  # boards/native_sim.overlay

@@ -2,15 +2,15 @@
 
 The twixt samples together, as a product would have them: three boards (a, b, c) and a console gateway (gw). Each board has
 
-- its shell on a UART over the bus to the gateway (as in `samples/twixt/uart`),
+- its shell on a UART over the bus to the gateway (as in `samples/uart` of twixt),
 - the setting `mcu/name`, and `twixt get` / `set` in the shell,
 - settings in NVS (`settings` partition) and littlefs at `/lfs` (`storage` partition),
-- MCUmgr on the shell with the fs and img groups (as in `samples/twixt/smp`).
+- MCUmgr on the shell with the fs and img groups (as in `samples/smp` of twixt).
 
 ## Build and run
 
 ```
-ws-zephyr/scripts/twixt_run.sh ws-zephyr/applications/twixt-system a b c gw
+modules/lib/twixt/scripts/twixt_run.sh ws-zephyr/applications/twixt-system a b c gw
 ```
 
 Open a board's PTY (the gateway prints it) with `tio`:
@@ -35,6 +35,6 @@ smpmgr warns that reading the MCUmgr parameters failed: the boards have no os gr
 
 Twister: `west twister -p native_sim -T ws-zephyr/applications/twixt-system`
 
-The gateway also builds for the Raspberry Pi Pico (`-b rpi_pico -DMCU=gw`), see `samples/twixt/uart`.
+The gateway also builds for the Raspberry Pi Pico (`-b rpi_pico -DMCU=gw`), see `samples/uart` of twixt.
 
 The west projects `littlefs`, `mcuboot` and `zcbor` are needed.
