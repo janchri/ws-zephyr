@@ -104,6 +104,7 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 		    size_t rsp_len)
 {
 	k_timepoint_t end = sys_timepoint_calc(K_MSEC(CONFIG_I2C_MM_RETRY_MS));
+	k_timepoint_t nack_end = sys_timepoint_calc(K_MSEC(CONFIG_I2C_MM_NACK_RETRY_MS));
 
 	if (req_len > I2C_MM_MSG_MAX || rsp_len > I2C_MM_MSG_MAX) {
 		return -EINVAL;
@@ -114,6 +115,7 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 	}
 
 	for (uint32_t i = 1;; i++) {
+		bool nack;
 		int ret;
 
 		/* re-registering must not hit another thread's transfer */
@@ -122,13 +124,21 @@ int i2c_mm_transfer(struct i2c_mm *mm, uint16_t addr, const void *req, size_t re
 		if (IS_ENABLED(CONFIG_I2C_MM_TARGET_REREGISTER)) {
 			(void)i2c_target_register(mm->i2c, &mm->target);
 		}
+		nack = ret == -ENXIO;
 		if (ret == 0) {
 			mm->stats.sent++;
-		} else if (ret == -EAGAIN || ret == -EBUSY) {
+		} else if (ret == -EAGAIN || ret == -EBUSY || nack) {
 			mm->stats.retries++;
 		}
 		k_mutex_unlock(&mm->lock);
 
+		if (nack) {
+			if (sys_timepoint_expired(nack_end)) {
+				return -EIO;
+			}
+			k_sleep(K_MSEC(1));
+			continue;
+		}
 		if ((ret != -EAGAIN && ret != -EBUSY) || sys_timepoint_expired(end)) {
 			return ret;
 		}

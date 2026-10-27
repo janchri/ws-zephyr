@@ -22,7 +22,7 @@ manifest:
     path: zephyr
     remote: zephyrproject
     repo-path: zephyr
-    revision: v4.4.0
+    revision: v4.5.0-rc2
 
     import:
       # Keep this list sorted alphabetically.

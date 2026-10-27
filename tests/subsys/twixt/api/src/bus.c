@@ -86,7 +86,7 @@ ZTEST(twixt_faults, test_request)
 	zassert_equal(atomic_get(&runs), before + 1);
 }
 
-/* A read without a request (a bus scan) gets -EINVAL, and does not run the last request */
+/* A read without a request (a bus scan) gets -EBADMSG, and does not run the last request */
 ZTEST(twixt_faults, test_read_alone)
 {
 	uint8_t rsp[2];
@@ -96,7 +96,7 @@ ZTEST(twixt_faults, test_read_alone)
 	before = atomic_get(&runs);
 
 	zassert_ok(i2c_read(I2C_DEV, rsp, sizeof(rsp), ADDR));
-	zassert_equal(rsp[0], EINVAL);
+	zassert_equal(rsp[0], EBADMSG);
 	zassert_equal(atomic_get(&runs), before, "the last request ran again");
 }
 
@@ -108,7 +108,7 @@ ZTEST(twixt_faults, test_write_alone)
 
 	zassert_ok(i2c_write(I2C_DEV, count_req, sizeof(count_req), ADDR));
 	zassert_ok(i2c_read(I2C_DEV, rsp, sizeof(rsp), ADDR));
-	zassert_equal(rsp[0], EINVAL);
+	zassert_equal(rsp[0], EBADMSG);
 	zassert_equal(atomic_get(&runs), before);
 }
 
@@ -182,7 +182,7 @@ ZTEST(twixt_faults, test_short_header)
 	uint8_t rsp[2];
 
 	zassert_ok(request(req, sizeof(req), rsp, sizeof(rsp)));
-	zassert_equal(rsp[0], EINVAL);
+	zassert_equal(rsp[0], EBADMSG);
 	zassert_equal(atomic_get(&runs), before);
 }
 

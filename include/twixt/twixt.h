@@ -32,7 +32,8 @@
  *
  * @c service picks the service (see the service ids), @c src is the sender's
  * address, @c flags is reserved: written as 0, ignored on receipt. @c status is 0 or an errno
- * without its sign; an error has no data.
+ * without its sign; an error has no data. EBADMSG means the request did not arrive whole
+ * (shorter than its header): no service ran, and twixt_request() sends it again.
  *
  * The lowest frame wins arbitration, so a lower service id has the higher
  * priority.
@@ -137,6 +138,7 @@ void twixt_get_stats(struct i2c_mm_stats *stats);
  * @retval -EAGAIN Lost arbitration until the deadline.
  * @retval -EBUSY Bus busy until the deadline.
  * @retval -ENOTSUP No such service there.
+ * @retval -EBADMSG The request did not arrive whole, three times.
  * @retval -errno Error of the service.
  */
 int twixt_request(uint8_t addr, uint8_t service, const void *data, size_t len, void *rsp_data,

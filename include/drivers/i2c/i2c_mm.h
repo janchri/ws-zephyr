@@ -30,7 +30,8 @@
  * STOP. A read without a request gets the callback with an empty request.
  *
  * Needs an I2C driver that is controller and target on one block and reports a
- * lost arbitration as -EAGAIN.
+ * lost arbitration as -EAGAIN. A target may NACK for a moment after its own
+ * transfers, while its block switches back to target mode.
  */
 
 /** Longest request and longest response, in bytes */
@@ -57,7 +58,7 @@ struct i2c_mm_stats {
 	uint32_t sent;
 	/** Requests of others answered */
 	uint32_t served;
-	/** Attempts lost to other masters or to a busy bus */
+	/** Attempts lost to other masters, to a busy bus or to an address NACK */
 	uint32_t retries;
 };
 
@@ -96,7 +97,9 @@ int i2c_mm_init(struct i2c_mm *mm, const struct device *i2c, uint16_t addr, i2c_
  *
  * Bytes the target did not answer read as 0xff. A request to the own address
  * runs the callback directly. Lost arbitration and a busy bus are retried for
- * up to CONFIG_I2C_MM_RETRY_MS. Threads may call this concurrently.
+ * up to CONFIG_I2C_MM_RETRY_MS, an address NACK (-ENXIO from the driver) for up
+ * to CONFIG_I2C_MM_NACK_RETRY_MS.
+ * Threads may call this concurrently.
  *
  * If reading the response fails, the request may or may not have run.
  *

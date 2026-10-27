@@ -5,13 +5,16 @@
  */
 
 /* The gateway on a Raspberry Pi Pico: the bus on I2C0, SDA GP4 (pin 6) and SCL
- * GP5 (pin 7); the boards are USB CDC-ACM ports on the laptop, /dev/ttyACM*.
- * The Pico is only the gateway (-DMCU=gw).
+ * GP5 (pin 7); the boards are USB CDC-ACM ports on the laptop, /dev/ttyACM*,
+ * and so is the gateway's own shell and log. The Pico is only the gateway
+ * (-DMCU=gw).
  */
 
 / {
 	chosen {
 		twixt,self = &TWIXT_SELF_LABEL;
+		zephyr,console = &host_log;
+		zephyr,shell-uart = &host_log;
 	};
 };
 
@@ -50,5 +53,12 @@
 		compatible = "zephyr,cdc-acm-uart";
 		label = "twixt board c";
 		status = "disabled";
+	};
+
+	/* Last, so the boards keep their interfaces */
+	host_log: host-log {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "twixt gateway";
+		hw-flow-control;
 	};
 };

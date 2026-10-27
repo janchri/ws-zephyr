@@ -34,9 +34,11 @@ void twixt_get_stats(struct i2c_mm_stats *stats)
 	i2c_mm_get_stats(&link, stats);
 }
 
+#define TWIXT_BADMSG_TRIES 3
+
 static size_t serve(const uint8_t *req, size_t len, uint8_t *rsp)
 {
-	int ret = -EINVAL;
+	int ret = -EBADMSG;
 
 	if (len >= TWIXT_REQ_HDR_LEN) {
 		const struct twixt_req r = {
@@ -49,7 +51,8 @@ static size_t serve(const uint8_t *req, size_t len, uint8_t *rsp)
 		STRUCT_SECTION_FOREACH(twixt_service, s) {
 			if (s->id == req[0]) {
 				ret = s->handler(&r, &rsp[1]);
-				if (ret == -EIO || ret == -EAGAIN || ret == -EBUSY) {
+				if (ret == -EIO || ret == -EAGAIN || ret == -EBUSY ||
+				    ret == -EBADMSG) {
 					LOG_ERR("service 0x%02x: %d is for the bus", s->id, ret);
 					ret = -EFAULT;
 				}
@@ -79,9 +82,16 @@ int twixt_request(uint8_t addr, uint8_t service, const void *data, size_t len, v
 		memcpy(&req[TWIXT_REQ_HDR_LEN], data, len);
 	}
 
-	ret = i2c_mm_transfer(&link, addr, req, TWIXT_REQ_HDR_LEN + len, in, 1 + rsp_len);
-	if (ret) {
-		return ret;
+	for (int i = 1;; i++) {
+		ret = i2c_mm_transfer(&link, addr, req, TWIXT_REQ_HDR_LEN + len, in, 1 + rsp_len);
+		if (ret) {
+			return ret;
+		}
+		if (in[0] != EBADMSG || i == TWIXT_BADMSG_TRIES) {
+			break;
+		}
+		LOG_WRN("0x%02x: request to 0x%02x attempt %d: incomplete there, again",
+			twixt_self_addr(), addr, i);
 	}
 	if (in[0] != 0) {
 		return -in[0];

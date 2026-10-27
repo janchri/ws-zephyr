@@ -9,7 +9,6 @@ config UART_TWIXT
 	select SERIAL_HAS_DRIVER
 	select SERIAL_SUPPORT_INTERRUPT
 	select UART_INTERRUPT_DRIVEN
-	select RING_BUFFER
 	help
 	  See dts/bindings/serial/twixt,uart.yaml.
 

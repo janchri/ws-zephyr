@@ -30,6 +30,17 @@ config I2C_MM_RETRY_MS
 	int "Retry time after lost arbitration or a busy bus, in ms"
 	default 500
 
+config I2C_MM_NACK_RETRY_MS
+	int "Retry time after an address NACK, in ms"
+	default 5
+	help
+	  A target that is a controller itself a moment ago may NACK its address
+	  until it is a target again: an I2C block that cannot be both at once,
+	  such as the DesignWare one (Raspberry Pi Pico), switches in between.
+	  An address NACK the driver reports as -ENXIO is retried for this long
+	  before the target counts as absent (-EIO). Other NACKs are not retried:
+	  the request may have run.
+
 config I2C_MM_TARGET_REREGISTER
 	bool "Register the target again after every transfer"
 	default y if DT_HAS_SNPS_DESIGNWARE_I2C_ENABLED

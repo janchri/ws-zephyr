@@ -29,6 +29,6 @@ Twister: `west twister -p native_sim -T ws-zephyr/samples/twixt/uart`
 west build -b rpi_pico -d build-gw ws-zephyr/samples/twixt/uart -- -DMCU=gw
 ```
 
-Copy `build-gw/zephyr/zephyr.uf2` to the Pico in BOOTSEL mode. The bus is I2C0: SDA GP4, SCL GP5, with 4.7 kΩ pull-ups to 3.3 V. Each board is a USB CDC-ACM port, `/dev/serial/by-id/usb-twixt_twixt_console_gateway-if00` (a), `-if02` (b), `-if04` (c).
+Copy `build-gw/zephyr/zephyr.uf2` to the Pico in BOOTSEL mode. The bus is I2C0: SDA GP4, SCL GP5, with 4.7 kΩ pull-ups to 3.3 V. Each board is a USB CDC-ACM port, `/dev/serial/by-id/usb-twixt_twixt_console_gateway-if00` (a), `-if02` (b), `-if04` (c); the gateway's own shell and log is `-if06` (`twixt ping 0x10`).
 
 The Pico's I2C driver reports lost arbitration as `-EIO` and is no target during its own transfers, so characters can get lost when the gateway and a board send at once.

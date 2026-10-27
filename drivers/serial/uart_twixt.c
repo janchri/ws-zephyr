@@ -162,13 +162,6 @@ static int uart_twixt_irq_is_pending(const struct device *dev)
 	return uart_twixt_irq_tx_ready(dev) || (d->rx_irq && uart_twixt_irq_rx_ready(dev));
 }
 
-static int uart_twixt_irq_update(const struct device *dev)
-{
-	ARG_UNUSED(dev);
-
-	return 1;
-}
-
 static void uart_twixt_irq_callback_set(const struct device *dev, uart_irq_callback_user_data_t cb,
 					void *user_data)
 {
@@ -200,7 +193,6 @@ static DEVICE_API(uart, uart_twixt_api) = {
 	.irq_rx_disable = uart_twixt_irq_rx_disable,
 	.irq_rx_ready = uart_twixt_irq_rx_ready,
 	.irq_is_pending = uart_twixt_irq_is_pending,
-	.irq_update = uart_twixt_irq_update,
 	.irq_callback_set = uart_twixt_irq_callback_set,
 };
 
@@ -229,7 +221,7 @@ static int uart_twixt_send(const struct device *dev)
 		taken = n; /* nobody answers: drop, as without a cable */
 	}
 	K_SPINLOCK(&d->lock) {
-		ring_buf_get(&d->tx, NULL, MIN(taken, n));
+		ring_buf_consume(&d->tx, MIN(taken, n));
 	}
 	return taken > 0 ? 1 : -EAGAIN;
 }
