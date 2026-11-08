@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+mainmenu "Twixt system"
+
+config TWIXT_GATEWAY
+    bool "Gateway role"
+    help
+      Select the gateway role instead of a node with persistent storage.
+
+source "Kconfig.zephyr"
+
+config TWIXT_USB_GATEWAY
+    def_bool TWIXT_GATEWAY && USB_DEVICE_STACK_NEXT
+
+config TWIXT_RP2040_WATCHDOG
+    def_bool TWIXT_GATEWAY && SOC_RP2040
+    select WATCHDOG

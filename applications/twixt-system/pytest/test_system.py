@@ -1,13 +1,15 @@
 # Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 #
-# The shells of the boards a, b and c, over the bus: twister builds the four
+# The shells of the boards pico, nrf and esp32, over the bus: twister builds the four
 # MCUs (sample.yaml) and starts the gateway as the DUT; this test starts the
 # boards, opens the PTY the gateway has for each, and runs shell commands there.
 # A command that gets a setting of another board goes over the bus once more;
 # the fs commands work on the board's littlefs. Every board runs in its build
 # folder, so its flash is the flash.bin there. MCUmgr (SMP) on the same PTY
 # moves a file to and from /lfs, and an image into slot 1.
+
+from contextlib import ExitStack
 
 import asyncio
 import os
@@ -20,26 +22,39 @@ import pytest
 from smpclient import SMPClient
 from smpclient.mcuboot import IMAGE_TLV, ImageInfo
 from smpclient.requests.image_management import ImageStatesRead
-from smpclient.transport.serial import SMPSerialTransport
+from smpclient.requests.os_management import EchoWrite, MCUMgrParametersRead
+from smpclient.transport.serial import BufferSize, SMPSerialTransport
 from twister_harness import DeviceAdapter
 
 TWIXT = Path(__file__).resolve().parents[4] / 'modules' / 'lib' / 'twixt'
 sys.path.insert(0, str(TWIXT / 'scripts' / 'pylib'))
-from twixt_bench import TIMEOUT_S, Shell, board_shells, gateway_ptys  # noqa: E402
+from twixt_bench import TIMEOUT_S, Shell, ptys, start_mcus  # noqa: E402
 
 BUS_ID = 5  # boards/native_sim.overlay
-BOARDS = {'a': 0x10, 'b': 0x11, 'c': 0x12}
+BOARDS = {'pico': 0x70, 'nrf': 0x11, 'esp32': 0x12}
 
 
 @pytest.fixture
 def ptys_of_boards(required_build_dirs: list[str], unlaunched_dut: DeviceAdapter):
-    with gateway_ptys(unlaunched_dut, required_build_dirs, BUS_ID, list(BOARDS)) as paths:
+    with start_mcus(required_build_dirs, BUS_ID):
+        unlaunched_dut.launch()
+        paths = {}
+        while set(paths) != set(BOARDS):
+            lines = unlaunched_dut.readlines_until(
+                regex=r'pty-\w+ connected', timeout=TIMEOUT_S
+            )
+            paths.update(ptys(lines))
         yield paths
 
 
 @pytest.fixture
 def shells(ptys_of_boards: dict[str, str]):
-    with board_shells(ptys_of_boards, BOARDS) as opened:
+    with ExitStack() as stack:
+        opened = {}
+        for name, addr in BOARDS.items():
+            shell = Shell(ptys_of_boards[name], f'mcu-{name}@{addr:x}:~$ ')
+            stack.callback(shell.close)
+            opened[name] = shell
         yield opened
 
 
@@ -53,6 +68,8 @@ def test_shell(shells: dict[str, Shell]):
         out = shell.run(f'twixt ping 0x{addr:02x}')
         assert f'0x{addr:02x}: protocol 1, messages up to 64 bytes' in out, out
 
+        assert shell.run(f'twixt add 0x{addr:02x} 20 22').strip() == '42'
+
         out = shell.run(f'twixt get 0x{addr:02x} mcu/name')
         assert f'0x{addr:02x} mcu/name = "mcu-{other}@{addr:x}"' in out
 
@@ -63,7 +80,7 @@ def test_shell(shells: dict[str, Shell]):
         out = shell.run(f'fs write /lfs/{n} -o 0 {" ".join(f"{b:x}" for b in n.encode())}')
         assert 'Failed' not in out, out
         out = shell.run('fs ls /lfs')
-        assert re.search(rf'^\s*1 {n}\r?$', out, re.M), out
+        assert re.search(rf'^\s*{len(n)} {n}\r?$', out, re.M), out
         out = shell.run(f'fs cat /lfs/{n}')
         assert out.strip() == n, out
 
@@ -74,7 +91,12 @@ def test_shell(shells: dict[str, Shell]):
 
 async def smp_transfers(pty: str, image_path: Path):
     """A file to /lfs and back, then an image into slot 1"""
-    async with SMPClient(SMPSerialTransport(), pty, timeout_s=TIMEOUT_S) as client:
+    async with SMPClient(SMPSerialTransport(fragmentation_strategy=BufferSize(256)), pty, timeout_s=TIMEOUT_S) as client:
+        echo = await client.request(EchoWrite(d='twixt-os'))
+        assert echo.r == 'twixt-os'
+        params = await client.request(MCUMgrParametersRead())
+        assert params.buf_size > 0 and params.buf_count > 0
+
         data = os.urandom(1024)
         async for _ in client.upload_file(data, '/lfs/smp.bin'):
             pass
@@ -100,4 +122,4 @@ def test_smp(ptys_of_boards: dict[str, str], tmp_path: Path):
          '--slot-size', '0x69000', payload, image_path],
         check=True,
     )  # fmt: skip
-    asyncio.run(smp_transfers(ptys_of_boards['a'], image_path))
+    asyncio.run(smp_transfers(ptys_of_boards['pico'], image_path))

@@ -1,0 +1,33 @@
+/*
+ * Copyright (c) 2026 Christoph Jans
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* USB gateway bridges remote shells to host ports. */
+
+/ {
+	chosen {
+		zephyr,shell-uart = &host_gw;
+	};
+
+
+	bus_uart_nrf: bus-uart-nrf {
+		compatible = "twixt,uart";
+		peer = <&mcu_nrf>;
+	};
+
+	bridge-nrf {
+		compatible = "zephyr,uart-bridge";
+		peers = <&bus_uart_nrf &host_nrf>;
+	};
+
+	bus_uart_esp32: bus-uart-esp32 {
+		compatible = "twixt,uart";
+		peer = <&mcu_esp32>;
+	};
+
+	bridge-esp32 {
+		compatible = "zephyr,uart-bridge";
+		peers = <&bus_uart_esp32 &host_esp32>;
+	};
+};

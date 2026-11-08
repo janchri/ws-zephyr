@@ -12,5 +12,6 @@ pre-commit-hooks==6.0.0
 clang-format==22.1.1
 ruff==0.14.2
 
-# MCUboot images: applications/twixt-system (smpclient comes with twixt)
+# MCUboot images and MCUmgr CLI: applications/twixt-system
 imgtool==2.5.0
+smpmgr==0.19.1

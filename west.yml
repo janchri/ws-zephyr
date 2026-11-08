@@ -24,7 +24,7 @@ manifest:
     path: zephyr
     remote: zephyrproject
     repo-path: zephyr
-    revision: v4.5.0-rc2
+    revision: v4.5.0
 
     import:
       # Keep this list sorted alphabetically.
@@ -36,9 +36,11 @@ manifest:
         - hal_stm32
         - hal_nordic
         - hal_rpi_pico
+        - libmetal
         - littlefs
         - mbedtls
         - mcuboot
+        - open-amp
         - segger
         - tf-psa-crypto
         - zcbor

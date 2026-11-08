@@ -10,45 +10,45 @@
  */
 
 / {
-	bus_uart_a: bus-uart-a {
+	bus_uart_pico: bus-uart-pico {
 		compatible = "twixt,uart";
-		peer = <&mcu_a>;
+		peer = <&mcu_pico>;
 	};
 
-	bridge-a {
+	bridge-pico {
 		compatible = "zephyr,uart-bridge";
-		peers = <&bus_uart_a &host_a>;
+		peers = <&bus_uart_pico &host_pico>;
 	};
 
-	bus_uart_b: bus-uart-b {
+	bus_uart_nrf: bus-uart-nrf {
 		compatible = "twixt,uart";
-		peer = <&mcu_b>;
+		peer = <&mcu_nrf>;
 	};
 
-	bridge-b {
+	bridge-nrf {
 		compatible = "zephyr,uart-bridge";
-		peers = <&bus_uart_b &host_b>;
+		peers = <&bus_uart_nrf &host_nrf>;
 	};
 
-	bus_uart_c: bus-uart-c {
+	bus_uart_esp32: bus-uart-esp32 {
 		compatible = "twixt,uart";
-		peer = <&mcu_c>;
+		peer = <&mcu_esp32>;
 	};
 
-	bridge-c {
+	bridge-esp32 {
 		compatible = "zephyr,uart-bridge";
-		peers = <&bus_uart_c &host_c>;
+		peers = <&bus_uart_esp32 &host_esp32>;
 	};
 };
 
-&host_a {
+&host_pico {
 	status = "okay";
 };
 
-&host_b {
+&host_nrf {
 	status = "okay";
 };
 
-&host_c {
+&host_esp32 {
 	status = "okay";
 };

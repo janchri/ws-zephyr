@@ -1,0 +1,81 @@
+/*
+ * Copyright (c) 2026 Christoph Jans
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* nrf. The bus on the Arduino SDA P1.02 / SCL P1.03, on the 1.8 V side of
+ * the PCA9306: TWIS2 is the target, the controller is software on the same
+ * pins (twixt,i2c-mm-gpio), since TWIM cannot detect lost arbitration. TWIM1
+ * (arduino_i2c) has the same pins and is off.
+ */
+
+#include <zephyr/dt-bindings/i2c/i2c.h>
+#include <zephyr/dt-bindings/gpio/nordic-nrf-gpio.h>
+
+
+
+/ {
+	chosen {
+		twixt,self = &mcu_nrf;
+	};
+
+	i2c-mm {
+		compatible = "twixt,i2c-mm-gpio";
+		target = <&i2c2>;
+		scl-gpios = <&gpio1 3 NRF_GPIO_DRIVE_H0>;
+		sda-gpios = <&gpio1 2 NRF_GPIO_DRIVE_H0>;
+		clock-frequency = <I2C_BITRATE_STANDARD>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+#include "../twixt_hardware_mcus.dtsi"
+	};
+};
+
+&arduino_i2c {
+	status = "disabled";
+};
+
+&i2c2 {
+	compatible = "nordic,nrf-twis";
+	status = "okay";
+	pinctrl-0 = <&i2c2_twis_default>;
+	pinctrl-1 = <&i2c2_twis_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&pinctrl {
+	i2c2_twis_default: i2c2_twis_default {
+		group1 {
+			psels = <NRF_PSEL(TWIS_SDA, 1, 2)>,
+				<NRF_PSEL(TWIS_SCL, 1, 3)>;
+			nordic,drive-mode = <NRF_DRIVE_H0D1>;
+		};
+	};
+
+	i2c2_twis_sleep: i2c2_twis_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIS_SDA, 1, 2)>,
+				<NRF_PSEL(TWIS_SCL, 1, 3)>;
+			low-power-enable;
+		};
+	};
+};
+
+/delete-node/ &storage_partition;
+
+&flash0 {
+	partitions {
+		settings_partition: partition@f8000 {
+			compatible = "zephyr,mapped-partition";
+			label = "settings";
+			reg = <0x000f8000 0x00004000>;
+		};
+
+		storage_partition: partition@fc000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0x000fc000 0x00004000>;
+		};
+	};
+};

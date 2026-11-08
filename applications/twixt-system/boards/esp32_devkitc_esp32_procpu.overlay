@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) 2026 Christoph Jans
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* esp32. The bus on I2C0: SDA GPIO21, SCL GPIO22, at 3.3 V, with external pull-ups. The target is
+ * the esp32 backend (twixt,esp32-i2c-target), the controller is software on the same pins
+ * (twixt,i2c-mm-gpio). The GPIO interrupt runs at priority 3, the same as the target ISR.
+ */
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/i2c/i2c.h>
+
+
+
+/ {
+	chosen {
+		twixt,self = &mcu_esp32;
+	};
+
+	i2c-mm {
+		compatible = "twixt,i2c-mm-gpio";
+		target = <&i2c0>;
+		scl-gpios = <&gpio0 22 GPIO_PULL_UP>;
+		sda-gpios = <&gpio0 21 GPIO_PULL_UP>;
+		clock-frequency = <I2C_BITRATE_STANDARD>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+#include "../twixt_hardware_mcus.dtsi"
+	};
+};
+
+&i2c0 {
+	compatible = "twixt,esp32-i2c-target";
+	status = "okay";
+	port = <0>;
+	scl-gpios = <&gpio0 22 GPIO_PULL_UP>;
+	sda-gpios = <&gpio0 21 GPIO_PULL_UP>;
+};
+
+&gpio0 {
+	interrupts = <GPIO_INTR_SOURCE 3 0>;
+};
+
+/* The 192 kB storage partition holds settings (16 kB) and littlefs (the rest) */
+/delete-node/ &storage_partition;
+
+&flash0 {
+	partitions {
+		settings_partition: partition@3b0000 {
+			compatible = "zephyr,mapped-partition";
+			label = "settings";
+			reg = <0x003b0000 0x00004000>;
+		};
+
+		storage_partition: partition@3b4000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0x003b4000 0x0002c000>;
+		};
+	};
+};

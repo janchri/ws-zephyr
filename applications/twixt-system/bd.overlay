@@ -1,14 +1,17 @@
 /*
- * Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
- *
+ * Copyright (c) 2026 Christoph Jans
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* A board: its shell is on a UART over the bus, to the gateway. Settings are in
- * NVS on settings_partition, and littlefs on storage_partition is mounted at
- * /lfs, for the "fs" shell commands; where the partitions are is up to the
- * board (boards/<board>.overlay).
+/* A board: its shell is on a UART over the bus to the gateway. Settings are in
+ * NVS on settings_partition, littlefs on storage_partition is mounted at /lfs.
+ * Included by each board overlay (boards/), which adds the bus, the partitions
+ * and which MCU the board is (twixt,self).
  */
+
+#ifndef TWIXT_GATEWAY_LABEL
+#define TWIXT_GATEWAY_LABEL mcu_pico
+#endif
 
 / {
 	chosen {
@@ -18,7 +21,7 @@
 
 	bus_uart: bus-uart {
 		compatible = "twixt,uart";
-		peer = <&mcu_gw>;
+		peer = <&TWIXT_GATEWAY_LABEL>;
 	};
 
 	fstab {

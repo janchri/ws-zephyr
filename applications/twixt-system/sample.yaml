@@ -9,7 +9,7 @@ common:
     - shell
 tests:
   # The gateway, started by twister; pytest/test_system.py starts the
-  # boards a, b and c next to it, from the builds below, on the same virtual bus
+  # boards pico, nrf and esp32 next to it, from the builds below, on the same virtual bus
   app.twixt.system:
     platform_allow: native_sim
     integration_platforms:
@@ -17,25 +17,39 @@ tests:
     extra_args: MCU=gw
     harness: pytest
     required_applications:
-      - name: app.twixt.system.mcu_a
-      - name: app.twixt.system.mcu_b
-      - name: app.twixt.system.mcu_c
-  app.twixt.system.mcu_a:
+      - name: app.twixt.system.mcu_pico
+      - name: app.twixt.system.mcu_nrf
+      - name: app.twixt.system.mcu_esp32
+  app.twixt.system.mcu_pico:
     platform_allow: native_sim
-    extra_args: MCU=a
+    extra_args: MCU=pico
     build_only: true
-  app.twixt.system.mcu_b:
+  app.twixt.system.mcu_nrf:
     platform_allow: native_sim
-    extra_args: MCU=b
+    extra_args: MCU=nrf
     build_only: true
-  app.twixt.system.mcu_c:
+  app.twixt.system.mcu_esp32:
     platform_allow: native_sim
-    extra_args: MCU=c
+    extra_args: MCU=esp32
     build_only: true
-  # The gateway on a Raspberry Pi Pico, on real I2C
-  app.twixt.system.gateway_hw:
-    platform_allow: rpi_pico
-    integration_platforms:
-      - rpi_pico
-    extra_args: MCU=gw
+  app.twixt.system.pico_node:
+    platform_allow: rpi_pico/rp2040/mcuboot
+    extra_args: CONF_FILE=bd.conf
+    build_only: true
+  app.twixt.system.pico_gateway:
+    platform_allow: rpi_pico/rp2040/mcuboot
+    extra_args: CONF_FILE=gw.conf
+    build_only: true
+  app.twixt.system.nrf_node:
+    platform_allow: nrf7002dk/nrf5340/cpuapp
+    extra_args: CONF_FILE=bd.conf
+    build_only: true
+  app.twixt.system.nrf_ble_gateway:
+    platform_allow: nrf7002dk/nrf5340/cpuapp
+    sysbuild: true
+    extra_args: twixt-system_CONF_FILE=gw.conf
+    build_only: true
+  app.twixt.system.esp_node:
+    platform_allow: esp32_devkitc/esp32/procpu
+    extra_args: CONF_FILE=bd.conf
     build_only: true

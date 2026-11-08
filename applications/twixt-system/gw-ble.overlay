@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* BLE management gateway; keep its shell reachable through the Pico USB port. */
+/ {
+	chosen {
+		zephyr,shell-uart = &bus_uart;
+	};
+
+	bus_uart: bus-uart {
+		compatible = "twixt,uart";
+		peer = <&mcu_pico>;
+	};
+};
