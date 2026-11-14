@@ -1,0 +1,23 @@
+[DOCUMENT]
+TITLE: Temperature alarm requirements
+
+[REQUIREMENT]
+UID: DEMO-SYS-001
+TITLE: Indicate excessive temperature
+STATEMENT: The software shall indicate whether an integer temperature reading requires an alarm.
+
+[REQUIREMENT]
+UID: DEMO-SW-001
+TITLE: Alarm at or above 50 C
+STATEMENT: For every integer temperature at or above 50 degrees Celsius, alarm_required shall return true.
+RELATIONS:
+- TYPE: Parent
+  VALUE: DEMO-SYS-001
+
+[REQUIREMENT]
+UID: DEMO-SW-002
+TITLE: No alarm below 50 C
+STATEMENT: For every integer temperature below 50 degrees Celsius, alarm_required shall return false.
+RELATIONS:
+- TYPE: Parent
+  VALUE: DEMO-SYS-001

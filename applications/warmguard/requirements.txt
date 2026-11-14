@@ -1,0 +1,4 @@
+# Optional tools for this example; install after west update zdocs.
+-r ../../doc/requirements.txt
+# Pre-alpha: pin the source, not just its development version number.
+affirmatrix @ git+https://github.com/tiacsys/affirmatrix.git@fb3f4dcd8439c1566b6a69d3e5e6ca7fb8fb61ab

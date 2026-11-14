@@ -74,12 +74,12 @@ LOG_MODULE_REGISTER(mfrc522, CONFIG_WW_LOG_LEVEL);
 #define TX_CONTROL_ANTENNAS 0x03
 
 /* ISO 14443A card commands */
-#define PICC_WUPA         0x52
-#define PICC_SEL_CL1      0x93 /* CL2 = 0x95, CL3 = 0x97 */
-#define PICC_NVB_ANTICOLL 0x20
-#define PICC_NVB_SELECT   0x70
-#define PICC_HLTA         0x50
-#define PICC_CASCADE_TAG  0x88
+#define PICC_WUPA          0x52
+#define PICC_SEL_CL1       0x93 /* CL2 = 0x95, CL3 = 0x97 */
+#define PICC_NVB_ANTICOLL  0x20
+#define PICC_NVB_SELECT    0x70
+#define PICC_HLTA          0x50
+#define PICC_CASCADE_TAG   0x88
 #define SAK_UID_INCOMPLETE BIT(2)
 
 /* The chip timer ends a transceive after 25 ms without answer, see init */
@@ -420,7 +420,7 @@ static int mfrc522_init(const struct device *dev)
 
 #define MFRC522_DEFINE(n)                                                                          \
 	static const struct mfrc522_config mfrc522_config_##n = {                                  \
-		.spi = SPI_DT_SPEC_INST_GET(n, SPI_OP_MODE_MASTER | SPI_WORD_SET(8)),            \
+		.spi = SPI_DT_SPEC_INST_GET(n, SPI_OP_MODE_CONTROLLER | SPI_WORD_SET(8)),          \
 		.reset = GPIO_DT_SPEC_INST_GET_OR(n, reset_gpios, {0}),                            \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(n, mfrc522_init, NULL, NULL, &mfrc522_config_##n, POST_KERNEL,       \

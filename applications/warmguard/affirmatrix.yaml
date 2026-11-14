@@ -1,0 +1,20 @@
+# Native Affirmatrix readers: needs exports + Doxygen source locations.
+case: ../../../assurance/warmguard
+repositories:
+  firmware: ../..
+implementation: firmware
+producer:
+  repository: firmware
+  requirements:
+    export: ../../../build/docs/deploy/html/workspace/needs.json
+    types: [req]
+    source-map:
+      warmguard/requirements: ./docs/requirements.sdoc
+  implementations:
+    export: ../../../build/docs/deploy/html/workspace/needs.json
+    doxygen: ../../../build/docs/deploy/xml/api
+    types: [impl]
+  specifications:
+    export: ../../../build/docs/deploy/html/workspace/needs.json
+    doxygen: ../../../build/docs/deploy/xml/tests
+    types: [test_case]

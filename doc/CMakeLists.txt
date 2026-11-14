@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+cmake_minimum_required(VERSION 3.20.0)
+project(ws_zephyr_docs LANGUAGES NONE)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE} COMPONENTS doc)
+get_filename_component(ZDOCS_PROJECT_BASE ${CMAKE_CURRENT_LIST_DIR}/.. ABSOLUTE)
+set(ZDOCS_WEST_TOPDIR ${WEST_TOPDIR})
+set(ZDOCS_DOXYGEN_INC_ROOTS ${ZDOCS_PROJECT_BASE}/applications/warmguard/src)
+list(APPEND CMAKE_MODULE_PATH ${ZEPHYR_ZDOCS_MODULE_DIR}/cmake)
+include(zdocs)
+add_docs_from_registry(REGISTRY ${CMAKE_CURRENT_LIST_DIR}/documents.yaml)
+add_doc_check(REGISTRY ${CMAKE_CURRENT_LIST_DIR}/documents.yaml)

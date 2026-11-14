@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+west-commands:
+  - file: scripts/docs.py
+    commands:
+      - name: docs
+        class: Docs
+        help: build and serve workspace documentation
+  - file: scripts/safety.py
+    commands:
+      - name: safety
+        class: Safety
+        help: build, verify and review the requirements example

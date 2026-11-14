@@ -1,0 +1,46 @@
+{
+  "simulation": true,
+  "device": "WarmGuard training scenario",
+  "records": {
+    "intended_use": {
+      "status": "simulated",
+      "summary": "Fictional contact-warmer alarm and unresolved classification assessment are described in the scenario.",
+      "evidence": ["applications/warmguard/MDR-WORKFLOW.rst"]
+    },
+    "quality_system": {
+      "status": "simulated",
+      "summary": "Simulated roles, controlled changes and approval steps are described; no real QMS is asserted.",
+      "evidence": ["applications/warmguard/MDR-WORKFLOW.rst"]
+    },
+    "risk": {
+      "status": "simulated",
+      "summary": "A fictional missed-alarm hazard, candidate control and residual-risk decision are documented.",
+      "evidence": ["applications/warmguard/MDR-WORKFLOW.rst", "applications/warmguard/docs/requirements.sdoc"]
+    },
+    "verification_validation": {
+      "status": "simulated",
+      "summary": "A real unit-test specification and a simulated whole-device verification plan are identified.",
+      "evidence": ["applications/warmguard/tests/main.c", "applications/warmguard/MDR-WORKFLOW.rst"]
+    },
+    "clinical_usability_security": {
+      "status": "simulated",
+      "summary": "Fictional clinical, usability and security scenarios are described without claiming real results.",
+      "evidence": ["applications/warmguard/MDR-WORKFLOW.rst"]
+    },
+    "tools_dependencies": {
+      "status": "simulated",
+      "summary": "Simulated tool-use and dependency review is documented; real qualification is not established.",
+      "evidence": ["applications/warmguard/requirements.txt", "applications/warmguard/MDR-WORKFLOW.rst"]
+    },
+    "technical_documentation": {
+      "status": "simulated",
+      "summary": "The scenario maps fictional technical documentation to source and evidence references.",
+      "evidence": ["applications/warmguard/MDR-WORKFLOW.rst", "applications/warmguard/docs/requirements.sdoc"]
+    },
+    "release_postmarket": {
+      "status": "simulated",
+      "summary": "A fictional release decision, complaint and change-control exercise are described.",
+      "evidence": ["applications/warmguard/MDR-WORKFLOW.rst"]
+    }
+  }
+}

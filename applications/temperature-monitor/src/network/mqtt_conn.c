@@ -17,12 +17,11 @@
 #include "w1_ds18b20.h"
 #include "credentials.h"
 
-#define MQTT_POLL_MSEC	100
-#define MQTT_PORT 1883
-#define MQTT_TOPIC "zephyr/sensor"
+#define MQTT_POLL_MSEC 100
+#define MQTT_PORT      1883
 
 #define CONFIG_MQTT_STACKSIZE 1024
-#define CONFIG_MQTT_PRIORITY 7
+#define CONFIG_MQTT_PRIORITY  7
 
 LOG_MODULE_REGISTER(mqtt_conn, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -61,8 +60,7 @@ static int poll_socks(int timeout)
 	return ret;
 }
 
-void app_mqtt_evt_handler(struct mqtt_client *const client,
-		      const struct mqtt_evt *evt)
+void app_mqtt_evt_handler(struct mqtt_client *const client, const struct mqtt_evt *evt)
 {
 	int err;
 
@@ -95,9 +93,8 @@ void app_mqtt_evt_handler(struct mqtt_client *const client,
 
 		LOG_INF("PUBREC packet id: %u", evt->param.pubrec.message_id);
 
-		const struct mqtt_pubrel_param rel_param = {
-			.message_id = evt->param.pubrec.message_id
-		};
+		const struct mqtt_pubrel_param rel_param = {.message_id =
+								    evt->param.pubrec.message_id};
 
 		err = mqtt_publish_qos2_release(client, &rel_param);
 		if (err != 0) {
@@ -112,8 +109,7 @@ void app_mqtt_evt_handler(struct mqtt_client *const client,
 			break;
 		}
 
-		LOG_INF("PUBCOMP packet id: %u",
-			evt->param.pubcomp.message_id);
+		LOG_INF("PUBCOMP packet id: %u", evt->param.pubcomp.message_id);
 
 		break;
 
@@ -135,7 +131,7 @@ static int app_mqtt_publish(struct mqtt_client *client, const char *topic, uint8
 	param.message.payload.data = payload;
 	param.message.payload.len = strlen(payload);
 
-	param.message.topic.topic.utf8 =  topic;
+	param.message.topic.topic.utf8 = topic;
 	param.message.topic.topic.size = strlen(topic);
 	param.message.topic.qos = MQTT_QOS_0_AT_MOST_ONCE;
 
@@ -230,8 +226,8 @@ static int app_mqtt_process_mqtt(struct mqtt_client *client)
 	return 0;
 }
 
-static void handler_cb(struct net_mgmt_event_callback *cb,
-		    uint64_t mgmt_event, struct net_if *iface)
+static void handler_cb(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
+		       struct net_if *iface)
 {
 	if (mgmt_event != NET_EVENT_IPV4_DHCP_BOUND) {
 		return;
@@ -244,8 +240,7 @@ static void wifi_interface_init(void)
 	LOG_INF("wifi_interface_init");
 	struct net_if *iface;
 
-	net_mgmt_init_event_callback(&dhcp_cb, handler_cb,
-				     NET_EVENT_IPV4_DHCP_BOUND);
+	net_mgmt_init_event_callback(&dhcp_cb, handler_cb, NET_EVENT_IPV4_DHCP_BOUND);
 
 	net_mgmt_add_event_callback(&dhcp_cb);
 
@@ -258,7 +253,6 @@ static void wifi_interface_init(void)
 	net_dhcpv4_start(iface);
 	k_sem_take(&netif_ready, K_FOREVER);
 }
-
 
 static void mqtt_thread()
 {
@@ -274,38 +268,34 @@ static void mqtt_thread()
 	int rc;
 	static int count = 50;
 
-	while(1) {
+	while (1) {
 		rc = app_mqtt_process_mqtt(&client_ctx);
 
-		if(rc != 0){
+		if (rc != 0) {
 			count--;
-		}
-		else{
+		} else {
 			count = 50;
 		}
-		if(count<0)
-		{
+		if (count < 0) {
 			sys_reboot(SYS_REBOOT_COLD);
 		}
 
-		while(!zbus_sub_wait(&mqtt_conn_sub, &chan, K_MSEC(200))){
+		while (!zbus_sub_wait(&mqtt_conn_sub, &chan, K_MSEC(200))) {
 			ds18b20_value_msg = zbus_chan_msg(&ds18b20_value_chan);
 
-			snprintf((char *)temp_str, sizeof(temp_str), "%.3f", (double)ds18b20_value_msg->tempf);
+			snprintf((char *)temp_str, sizeof(temp_str), "%.3f",
+				 (double)ds18b20_value_msg->tempf);
 			snprintk(rom_str, sizeof(rom_str),
-					"sensor/%02X%02X%02X%02X%02X%02X%02X%02X",
-         			ds18b20_value_msg->rom.family,
-					ds18b20_value_msg->rom.serial[0],
-					ds18b20_value_msg->rom.serial[1],
-					ds18b20_value_msg->rom.serial[2],
-					ds18b20_value_msg->rom.serial[3],
-					ds18b20_value_msg->rom.serial[4],
-					ds18b20_value_msg->rom.serial[5],
-         			ds18b20_value_msg->rom.crc);
+				 "sensor/%02X%02X%02X%02X%02X%02X%02X%02X",
+				 ds18b20_value_msg->rom.family, ds18b20_value_msg->rom.serial[0],
+				 ds18b20_value_msg->rom.serial[1], ds18b20_value_msg->rom.serial[2],
+				 ds18b20_value_msg->rom.serial[3], ds18b20_value_msg->rom.serial[4],
+				 ds18b20_value_msg->rom.serial[5], ds18b20_value_msg->rom.crc);
 
 			app_mqtt_publish(&client_ctx, rom_str, temp_str);
 		}
 	}
 }
 
-K_THREAD_DEFINE(mqtt_thread_id, CONFIG_MQTT_STACKSIZE, mqtt_thread, NULL, NULL, NULL, CONFIG_MQTT_PRIORITY, 0,0);
+K_THREAD_DEFINE(mqtt_thread_id, CONFIG_MQTT_STACKSIZE, mqtt_thread, NULL, NULL, NULL,
+		CONFIG_MQTT_PRIORITY, 0, 0);

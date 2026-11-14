@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* The RTD theme wraps tables after DataTables adds its floated controls.
+ * Clear those controls on the wrapper, so it cannot shrink beside them.
+ */
+.rst-content .dataTables_wrapper > .wy-table-responsive {
+    clear: both;
+    width: 100%;
+    padding-top: 0.75rem;
+}
+
+/* Include table borders in its width to avoid a needless desktop scrollbar. */
+.rst-content .dataTables_wrapper table.dataTable {
+    box-sizing: border-box;
+}
+
+.affirmatrix-state {
+    display: inline-block;
+    padding: 0.15em 0.5em;
+    border: 1px solid #9ca3af;
+    border-radius: 0.3em;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+}
+
+.affirmatrix-active {
+    background: #dcfce7;
+    border-color: #86b898;
+    color: #14532d;
+}
+
+.affirmatrix-pending {
+    background: #fef3c7;
+    border-color: #c9aa56;
+    color: #713f12;
+}
+
+.affirmatrix-directlyoutdated,
+.affirmatrix-transitivelysuspect,
+.affirmatrix-doublyoutdated,
+.affirmatrix-broken,
+.affirmatrix-vanished {
+    background: #fee2e2;
+    border-color: #d99b9b;
+    color: #7f1d1d;
+}
+
+/* Source paths and requirement IDs must remain readable on narrow screens. */
+.rst-content p code.literal {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}

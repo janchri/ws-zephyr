@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+base_url: http://127.0.0.1:8000/
+doxygen_xml: true
+groups:
+  - id: guides
+    title: Workspace documentation
+    mode: always_keep
+  - id: reference
+    title: C reference
+    mode: always_keep
+documents:
+  workspace:
+    title: ws-zephyr
+    group: guides
+    kind: sphinx
+    doc_dir: .
+    builders: [html]
+    needs: {source: json}
+    doxygen_tag: {types: [req]}
+    symbol_needs:
+      doxygen_source: api
+    testmodule:
+      doxygen_source: tests
+      api_reference: api
+  api:
+    title: Alarm C API
+    group: reference
+    kind: doxygen
+    doc_dir: ../applications/warmguard/docs/api
+  tests:
+    title: Alarm C tests
+    group: reference
+    kind: doxygen
+    doc_dir: ../applications/warmguard/docs/tests

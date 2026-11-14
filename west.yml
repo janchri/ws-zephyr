@@ -17,6 +17,7 @@ manifest:
 
   self:
     path: ws-zephyr
+    west-commands: scripts/west-commands.yml
 
   projects:
 
@@ -49,3 +50,9 @@ manifest:
     remote: janchri
     revision: main
     path: modules/lib/twixt
+
+  # Documentation federation used by applications/warmguard.
+  - name: zdocs
+    url: https://github.com/tiacsys/zdocs
+    revision: f9b701c1eba44221f60c50a2687215ec1aa137ee
+    path: tools/zdocs
