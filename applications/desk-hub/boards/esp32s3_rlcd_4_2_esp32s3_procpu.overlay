@@ -1,0 +1,12 @@
+/*
+ * Copyright (c) 2026 Christoph Jans <jans.christoph@gmail.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&st7306 {
+	/* Use forward column and data order for partial writes.
+	 * The panel's 26 column addresses (17 through 42) are centered in GRAM.
+	 */
+	remap-value = <0x00>;
+};

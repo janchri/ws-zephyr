@@ -3,4 +3,5 @@ name: janchri-ws-zephyr
 build:
   settings:
     board_root: .
+    snippet_root: .
     module_ext_root: .

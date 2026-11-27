@@ -1,7 +1,7 @@
 ws-zephyr
 =========
 
-A Zephyr workspace with four applications: a multi-MCU hub, an RFID music box,
+A Zephyr workspace with five applications: a desk display, a multi-MCU hub, an RFID music box,
 a temperature-to-MQTT prototype, and a small requirements and testing exercise.
 The manifest selects Zephyr and the libraries these applications use.
 
@@ -14,6 +14,9 @@ Choose where to start
    * - Application
      - What to expect
      - Start here
+   * - Desk Hub
+     - LVGL app menu with Game of Life and Calendar for an ESP32-S3 RLCD display; includes native simulation
+     - `Application guide <applications/desk-hub/README.rst>`__
    * - Twixt Hub
      - I2C communication between MCUs, gateways, storage and firmware management; native simulation
        and hardware configurations

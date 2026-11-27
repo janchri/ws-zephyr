@@ -1,0 +1,8 @@
+sample:
+  name: Desk Hub Sample
+tests:
+  sample.applications.deskhub:
+    build_only: true
+    platform_allow:
+      - esp32s3_rlcd_4_2/esp32s3/procpu
+      - native_sim/native/64

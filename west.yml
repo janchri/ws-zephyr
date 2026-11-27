@@ -39,6 +39,7 @@ manifest:
         - hal_rpi_pico
         - libmetal
         - littlefs
+        - lvgl
         - mbedtls
         - mcuboot
         - open-amp

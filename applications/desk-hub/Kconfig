@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config DESK_HUB_CONWAY
+	bool "Conway's Game of Life"
+	default y
+	depends on DISPLAY
+	select ENTROPY_GENERATOR
+	help
+	  Build and run Conway's Game of Life on the Desk Hub display.
+
+config DESK_HUB_CALENDAR
+	bool "Calendar and time"
+	default y
+	depends on DISPLAY
+	help
+	  Build the calendar and time app for the Desk Hub display.
+
+config DESK_HUB_EMULATOR
+	bool "SDL emulator controls"
+	default y
+	depends on DT_HAS_ZEPHYR_SDL_DC_ENABLED && LV_Z_AUTO_INIT
+	help
+	  Initialize the simulator toolbar after the SDL display and LVGL.
+	  The toolbar reserves its own space above the app content.
+
+source "Kconfig.zephyr"
